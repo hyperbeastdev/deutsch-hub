@@ -3,7 +3,7 @@
 Welcome to **Deutsch Hub**, a premium, AI-powered German language learning platform! This project combines spaced repetition (SRS), intelligent AI generation, and gamification to help you master German efficiently.
 
 ## 🔗 Live Demo
-[View Live Site (Coming Soon)](#)
+[View Live Site](https://deutsch-hub-ea48a.web.app/)
 
 ## ✨ Features
 *   **AI Flashcard Generation:** Generate custom flashcards instantly with Groq LLMs. Simply type what you want to learn or paste a list of words, and the AI handles translations, plural forms, and example sentences.
