@@ -15,9 +15,10 @@ Welcome to **Deutsch Hub**, a premium, AI-powered German language learning platf
 *   **PWA Ready:** Install Deutsch Hub as a standalone app on your mobile or desktop device.
 
 ## 🛠️ Tech Stack
-*   **Frontend:** React 19, Vite, Tailwind CSS
-*   **Backend & DB:** Firebase Auth, Firestore Realtime Database
-*   **AI Processing:** Groq SDK (Llama models), Google Generative AI
+- **Frontend:** React 19, Vite, Tailwind CSS
+- **Backend & DB:** Firebase Auth, Firestore Realtime Database
+- **AI Processing:** Groq SDK (Llama models), Google Generative AI
+- **API Security:** Cloudflare Workers proxy — AI API keys kept server-side, never exposed to client
 
 ## 📜 License
 This source code is made available for viewing and educational purposes only. See the [LICENSE](LICENSE) file for more information.
