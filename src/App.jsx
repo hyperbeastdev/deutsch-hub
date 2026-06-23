@@ -278,8 +278,8 @@ function detectOverrideLevel(input, selectedLevel) {
 }
 
 export async function generateAIFlashcards(prompt, level, existingTerms = []) {
-  if(!import.meta.env.VITE_GROQ_API_KEY) throw new Error("Groq API key missing in .env");
-  const groq = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
+  if(!import.meta.env.VITE_GROQ_PROXY_URL) throw new Error("Groq Proxy URL missing in .env");
+  const groq = new Groq({ apiKey: "proxy-key", baseURL: import.meta.env.VITE_GROQ_PROXY_URL, dangerouslyAllowBrowser: true });
   
   let excludeContext = "";
   if(existingTerms.length > 0) {
@@ -327,8 +327,8 @@ ${excludeContext}
 }
 
 async function generateAITutorResponse(mode, word, userInput, level) {
-  if(!import.meta.env.VITE_GROQ_API_KEY) throw new Error("Groq API key missing in .env");
-  const groq = new Groq({ apiKey: import.meta.env.VITE_GROQ_API_KEY, dangerouslyAllowBrowser: true });
+  if(!import.meta.env.VITE_GROQ_PROXY_URL) throw new Error("Groq Proxy URL missing in .env");
+  const groq = new Groq({ apiKey: "proxy-key", baseURL: import.meta.env.VITE_GROQ_PROXY_URL, dangerouslyAllowBrowser: true });
   
   const effectiveLevel = detectOverrideLevel(userInput, level);
 
