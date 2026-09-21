@@ -26,8 +26,8 @@ export default function CardItem({ card, i, isWeak, onEdit, onDelete }) {
         </span>
       )}
       <SpeakBtn text={card.back} small />
-      <button onClick={() => onEdit(card)} className="text-blue-400 hover:text-blue-600 text-xs px-1">✏️</button>
-      <button onClick={() => onDelete(card.id)} className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+      <button type="button" aria-label={`Edit ${card.back}`} onClick={() => onEdit(card)} className="text-blue-400 hover:text-blue-600 text-xs px-1">✏️</button>
+      <button type="button" aria-label={`Delete ${card.back}`} onClick={() => onDelete(card.id)} className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
     </div>
   );
 }

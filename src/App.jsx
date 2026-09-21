@@ -1,15 +1,26 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { auth, db, googleProvider } from "./firebase";
-import { signInWithPopup, signOut as fbSignOut, onAuthStateChanged } from "firebase/auth";
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
+import { db } from "./firebase";
 import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, limit, updateDoc, increment, where } from "firebase/firestore";
-import Groq from "groq-sdk";
-import BottomNav from "./components/BottomNav";
+import { generateAIFlashcards, generateAITutorResponse } from "./ai/service";
+import { getAIUserMessage } from "./ai/errors";
+import AppShell from "./components/AppShell";
 import { SpeakBtn, GBadge } from "./components/SharedUI";
 import DeckDetail from "./components/DeckDetail";
 import AITutorModal from "./components/AITutorModal";
 import ExploreTab from "./components/ExploreTab";
 import { SUPPORT_URL } from "./config/supportLinks";
+import { authService } from "./auth/authService";
+import { PROFILE_STATES, readUserProfile } from "./auth/profileRepository";
+import { normalizeAuthError } from "./auth/authErrors";
+import useDialogA11y from "./hooks/useDialogA11y";
+import {
+  THEME_PREFERENCES,
+  applyTheme,
+  getStoredThemePreference,
+  saveThemePreference,
+} from "./theme/theme";
 
+export { generateAIFlashcards };
 
 // ═══════════════════════════════════════════════════════════
 // CONSTANTS & DATA
@@ -126,9 +137,7 @@ export const isWeak = c => (c.confidenceScore ?? 70) < 40 || (c.failureCount ?? 
 
 // ── FIREBASE DB ──────────────────────────────────────────────
 export const DB = {
-  async getUser(uid) { 
-    try { const d=await getDoc(doc(db,"users",uid)); return d.exists()?d.data():null; } catch(e) { console.error(e); return null; }
-  },
+  async getUser(uid) { return readUserProfile(uid); },
   async setUser(uid, data) { 
     try { await setDoc(doc(db,"users",uid), data, { merge: true }); } catch(e) { console.error(e); }
   },
@@ -267,136 +276,6 @@ export const DB = {
   },
 };
 
-function detectOverrideLevel(input, selectedLevel) {
-  const text = (input || "").toLowerCase();
-  if (text.includes("beginner") || text.includes("simple")) return "A1";
-  if (text.includes("easy")) return "A2";
-  if (text.includes("intermediate")) return "B1";
-  if (text.includes("advanced")) return "C1";
-  if (text.includes("deep") || text.includes("detailed")) return "C2";
-  return selectedLevel;
-}
-
-export async function generateAIFlashcards(prompt, level, existingTerms = []) {
-  if(!import.meta.env.VITE_GROQ_PROXY_URL) throw new Error("Groq Proxy URL missing in .env");
-  const groq = new Groq({ apiKey: "proxy-key", baseURL: import.meta.env.VITE_GROQ_PROXY_URL, dangerouslyAllowBrowser: true });
-  
-  let excludeContext = "";
-  if(existingTerms.length > 0) {
-    const clipped = existingTerms.slice(-30).join(", ");
-    excludeContext = `\nCRITICAL CONTEXT: The user already has the following terms in their deck. DO NOT generate flashcards for any of these words: ${clipped}.`;
-  }
-
-  const effectiveLevel = detectOverrideLevel(prompt, level);
-
-  const sys = `You are an expert German teacher. Create exactly what the user asks for. 
-The user's level is: ${effectiveLevel}
-Follow CEFR guidelines strictly:
-- A1: very basic explanations, simple words
-- A2: simple structured sentences
-- B1: moderate grammar
-- B2: natural conversational tone
-- C1: advanced nuance
-- C2: deep linguistic explanation
-
-${excludeContext}
-  Rules:
-  1. If the word is a noun, you MUST include the article in the "back" field (e.g., "der Apfel"), specify gender accurately (der, die, das), and give the plural (e.g., "die Äpfel").
-  2. If it's a verb, put "verb" as gender and leave plural blank ("").
-  3. Provide an illustrative example sentence in German (exampleDe) and its natural translation (exampleEn).
-  
-  You MUST output ONLY a valid JSON object matching this structure:
-  {
-    "cards": [
-      {
-        "front": "English string",
-        "back": "German string with article",
-        "gender": "der/die/das/verb",
-        "plural": "string or empty string",
-        "exampleDe": "German sentence",
-        "exampleEn": "English translation"
-      }
-    ]
-  }`;
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: "system", content: sys }, { role: "user", content: `Task: ${prompt}` }],
-    model: "llama-3.1-8b-instant", temperature: 0.5, response_format: { type: "json_object" }
-  });
-  const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
-  return parsed.cards || [];
-}
-
-async function generateAITutorResponse(mode, word, userInput, level) {
-  if(!import.meta.env.VITE_GROQ_PROXY_URL) throw new Error("Groq Proxy URL missing in .env");
-  const groq = new Groq({ apiKey: "proxy-key", baseURL: import.meta.env.VITE_GROQ_PROXY_URL, dangerouslyAllowBrowser: true });
-  
-  const effectiveLevel = detectOverrideLevel(userInput, level);
-
-  if (mode === "correct") {
-    const prompt = `You are a German language tutor.
-The user's level is: ${effectiveLevel}
-
-Follow CEFR guidelines strictly:
-- A1: very basic explanations
-- A2: simple structured sentences
-- B1: moderate grammar
-- B2: natural conversational tone
-- C1: advanced nuance
-- C2: deep linguistic explanation
-
-Analyze the following sentence:
-"${userInput}"
-
-Return STRICT JSON in this format:
-{
-  "corrected": "...",
-  "mistakes": [
-    {
-      "original": "...",
-      "correct": "...",
-      "type": "capitalization | grammar | article | word order",
-      "reason": "..."
-    }
-  ],
-  "explanation": "...",
-  "improved": ["...", "..."]
-}
-
-Rules:
-- Identify ALL mistakes, not just one.
-- Keep explanation simple and appropriate for ${effectiveLevel} level.
-- Be precise
-- Improved must contain REAL alternative sentences (not meta text).
-- Do not add extra text outside JSON`;
-    
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "llama-3.1-8b-instant", temperature: 0.5, response_format: { type: "json_object" }
-    });
-    return JSON.parse(completion.choices[0]?.message?.content || "{}");
-  }
-
-  const prompts = {
-    explain: `You are a German language tutor. The user's level is: ${effectiveLevel}
-Follow CEFR guidelines strictly for vocabulary and explanation depth:
-- A1: very basic explanations
-- A2: simple structured sentences
-- B1: moderate grammar
-- B2: natural conversational tone
-- C1: advanced nuance
-- C2: deep linguistic explanation
-
-Explain the German word "${word}". Include: gender (if noun), plural form, 2-3 example sentences, common usage tips, and any tricky grammar. Keep it friendly and clear. Respond in plain text (no JSON).`,
-    sentences: `You are a German language tutor. The user's level is: ${effectiveLevel}
-Generate 5 natural, varied German example sentences using the word "${word}". For each sentence, give the German and then the English translation. Format each as:\n1. [German sentence]\n   → [English translation]`,
-  };
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: "user", content: prompts[mode] }],
-    model: "llama-3.1-8b-instant", temperature: 0.7
-  });
-  return completion.choices[0]?.message?.content || "No response.";
-}
-
 // ═══════════════════════════════════════════════════════════
 // COMPONENTS
 // ═══════════════════════════════════════════════════════════
@@ -485,7 +364,13 @@ function Onboarding({onComplete}) {
 }
 
 // ── AUTH SCREEN ───────────────────────────────────────────────
-function AuthScreen({onDemo,onGoogle}) {
+function AuthScreen({onGoogle, onCancelGoogle, googleLoading, authError}) {
+  const googleButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (authError) googleButtonRef.current?.focus();
+  }, [authError]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
@@ -494,7 +379,7 @@ function AuthScreen({onDemo,onGoogle}) {
         <p className="text-sm text-gray-400 mb-7">AI-powered German flashcards<br/>with spaced repetition</p>
 
         <div className="flex flex-col gap-3 mb-5">
-          <button onClick={onGoogle}
+          <button ref={googleButtonRef} type="button" onClick={onGoogle} disabled={googleLoading} aria-busy={googleLoading} aria-describedby={authError ? "auth-error" : undefined}
             className="flex items-center justify-center gap-3 w-full border-2 border-gray-200 rounded-2xl py-3 font-bold text-gray-700 hover:bg-gray-50 transition-colors text-sm">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -502,8 +387,11 @@ function AuthScreen({onDemo,onGoogle}) {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Continue with Google
+            {googleLoading ? "Opening Google…" : "Continue with Google"}
           </button>
+          {googleLoading && <button type="button" onClick={onCancelGoogle} className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700">Cancel sign-in</button>}
+          {googleLoading && <p role="status" className="text-xs text-gray-500 mt-2">Waiting for the sign-in window…</p>}
+          {authError && <p id="auth-error" role="alert" className="text-sm text-red-600 mt-3">{authError.message}</p>}
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-3 text-center">
@@ -543,10 +431,12 @@ function WordOfDay({addXP}) {
           : <span className="text-xs bg-white/20 px-3 py-1 rounded-full font-bold">✓ Claimed!</span>
         }
       </div>
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
         <GBadge g={w.gender} size="lg"/>
-        <p className="text-xl font-extrabold">{w.word}</p>
-        <SpeakBtn text={w.word}/>
+        <p className="min-w-0 flex-1 break-words text-xl font-extrabold">{w.word}</p>
+        <span className="w-full shrink-0 flex justify-end sm:w-auto">
+          <SpeakBtn text={w.word}/>
+        </span>
       </div>
       <p className="text-sm opacity-90 font-medium">{w.en}</p>
       <p className="text-xs opacity-70 mt-1 italic">{w.ex}</p>
@@ -669,7 +559,7 @@ export function ListeningQuiz({deck,onBack,addXP}) {
   };
   const next=()=>{setChosen(null);if(idx+1>=cards.length)setDone(true);else setIdx(i=>i+1);};
 
-  if(cards.length<4) return <div className="text-center py-10 text-gray-400"><p className="text-3xl mb-2">🎧</p><p className="text-sm">Need 4+ cards for listening quiz.</p><button onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
+  if(cards.length<4) return <div className="text-center py-10 text-gray-400"><p className="text-3xl mb-2">🎧</p><p className="text-sm">Need 4+ cards for listening quiz.</p><button type="button" aria-label="Back from listening quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
 
   if(done) return (
     <div className="flex flex-col gap-4 items-center text-center">
@@ -679,14 +569,14 @@ export function ListeningQuiz({deck,onBack,addXP}) {
         <p className="text-sm text-gray-500 mt-1">Listening accuracy: {Math.round(score/cards.length*100)}%</p>
       </div>
       <button onClick={()=>{setIdx(0);setScore(0);setDone(false);setChosen(null);}} className="w-full bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm">🔁 Retry</button>
-      <button onClick={onBack} className="w-full border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back</button>
+      <button type="button" aria-label="Back from listening results" onClick={onBack} className="w-full border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back</button>
     </div>
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button>
+        <button type="button" aria-label="Back from listening quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button>
         <p className="font-bold text-gray-700 flex-1">🎧 Listening &middot; {deck.name}</p>
         <span className="text-xs text-gray-400">{idx+1}/{cards.length}</span>
       </div>
@@ -695,9 +585,9 @@ export function ListeningQuiz({deck,onBack,addXP}) {
       </div>
       <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center border border-indigo-100">
         <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Listen and choose the correct word</p>
-        <button onClick={speak} className="w-20 h-20 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-4xl flex items-center justify-center mx-auto shadow-lg transition-colors">🔊</button>
+        <button type="button" aria-label="Play listening prompt" onClick={speak} className="w-20 h-20 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-4xl flex items-center justify-center mx-auto shadow-lg transition-colors">🔊</button>
         <p className="text-xs text-gray-400 mt-3">Tap to hear again</p>
-        <button onClick={speakSlow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition-colors shadow-sm">
+        <button type="button" aria-label="Play listening prompt slowly" onClick={speakSlow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition-colors shadow-sm">
           🐢 Slow
         </button>
       </div>
@@ -719,45 +609,82 @@ function Flashcard({card,onRate,setNote}) {
   const [flipped,setFlipped] = useState(false);
   const [editNote,setEditNote] = useState(false);
   const [noteVal,setNoteVal] = useState(card.note||"");
+  const flipActionRef = useRef(null);
+  const hasMounted = useRef(false);
   useEffect(()=>{setFlipped(false);setEditNote(false);setNoteVal(card.note||"");},[card.id]);
+  useEffect(()=>{
+    if (!hasMounted.current) { hasMounted.current = true; return; }
+    flipActionRef.current?.focus();
+  },[flipped]);
   const saveNote=()=>{setNote(card.id,noteVal);setEditNote(false);};
+  const toggleFlipped=()=>setFlipped(f=>!f);
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
-      <div className="w-full max-w-md cursor-pointer" style={{perspective:"1000px"}} onClick={()=>setFlipped(f=>!f)}>
-        <div style={{transition:"transform 0.45s",transformStyle:"preserve-3d",transform:flipped?"rotateY(180deg)":"rotateY(0deg)",position:"relative",minHeight:"240px"}}>
-          <div style={{backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden"}} className="absolute inset-0 bg-white rounded-2xl shadow-lg flex flex-col items-center justify-center p-6 border border-gray-200">
-            <p className="text-xs text-gray-400 mb-3 uppercase tracking-widest">English</p>
-            <p className="text-2xl font-bold text-gray-800 text-center">{card.front}</p>
-            {card.note&&<p className="mt-3 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1 text-center">📝 {card.note}</p>}
-            <p className="absolute bottom-3 left-3 text-xs text-gray-300">tap to flip</p>
-            {card.due&&<p className="absolute bottom-3 right-3 text-xs text-gray-300">next: {new Date(card.due).toLocaleDateString()}</p>}
+    <div className="dh-study-card-flow">
+      <div className="dh-study-card-wrap" style={{perspective:"1000px"}}>
+        <div
+          className={"dh-study-card " + (flipped ? "dh-study-card-revealed" : "")}
+          style={{transform:flipped?"rotateY(180deg)":"rotateY(0deg)"}}
+          role="group"
+          aria-label={`${flipped ? "Revealed" : "Unrevealed"} study card for ${card.front}`}
+        >
+          <div aria-hidden={flipped} inert={flipped} className="dh-study-card-face dh-study-card-front">
+            <button
+              ref={!flipped ? flipActionRef : undefined}
+              type="button"
+              tabIndex={flipped ? -1 : 0}
+              aria-expanded={flipped}
+              aria-label={`Reveal answer for ${card.front}`}
+              onClick={toggleFlipped}
+              className="dh-study-card-flip-action"
+            />
+            <p className="dh-study-eyebrow">Recall in German</p>
+            <p className="dh-study-prompt">{card.front}</p>
+            {card.note&&<p className="dh-study-note">Note: {card.note}</p>}
+            <p className="dh-study-reveal-hint">Press Enter or Space to reveal</p>
+            {card.due&&<p className="dh-study-due">Due {new Date(card.due).toLocaleDateString()}</p>}
           </div>
-          <div style={{backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",transform:"rotateY(180deg)"}} className="absolute inset-0 bg-gray-50 rounded-2xl shadow-lg flex flex-col items-center justify-center p-6 border border-gray-200">
-            <p className="text-xs text-gray-400 mb-2 uppercase tracking-widest">Deutsch</p>
-            <div className="flex items-center gap-2 mb-1"><GBadge g={card.gender}/><p className="text-2xl font-bold text-gray-800">{card.back}</p><SpeakBtn text={card.back}/></div>
-            {card.plural&&card.gender!=="verb"&&<p className="text-sm text-gray-500 mb-1">Plural: {card.plural}</p>}
-            <div className="mt-2 bg-white rounded-xl p-3 text-center border border-gray-100 w-full">
-              <p className="text-sm font-medium text-gray-700 mb-1">{card.exampleDe}</p>
-              <div className="flex justify-center mb-1"><SpeakBtn text={card.exampleDe} small/></div>
-              <p className="text-xs text-gray-400 italic">{card.exampleEn}</p>
+          <div aria-hidden={!flipped} inert={!flipped} className="dh-study-card-face dh-study-card-back">
+            <button
+              ref={flipped ? flipActionRef : undefined}
+              type="button"
+              tabIndex={flipped ? 0 : -1}
+              aria-expanded={flipped}
+              aria-label={`Hide answer for ${card.front}`}
+              onClick={toggleFlipped}
+              className="dh-study-card-flip-action"
+            />
+            <p className="dh-study-eyebrow">German answer</p>
+            <div className="dh-study-word-row">
+              <span className={"dh-study-gender dh-study-gender-" + (card.gender || "unknown")} aria-label={card.gender ? `Grammatical identity: ${card.gender}` : undefined}>{card.gender || ""}</span>
+              <p className="dh-study-word">{card.back}</p>
+              <SpeakBtn text={card.back}/>
             </div>
+            {card.plural&&card.gender!=="verb"&&<p className="dh-study-plural">Plural: {card.plural}</p>}
+            {(card.exampleDe||card.exampleEn)&&<div className="dh-study-context">
+              {card.exampleDe&&<p className="dh-study-example">{card.exampleDe}</p>}
+              {card.exampleDe&&<div className="dh-study-context-audio"><SpeakBtn text={card.exampleDe} small/></div>}
+              {card.exampleEn&&<p className="dh-study-translation">{card.exampleEn}</p>}
+            </div>}
           </div>
         </div>
       </div>
       {flipped&&(
         <>
-          <div className="flex gap-2 flex-wrap justify-center">
+          <fieldset className="dh-study-rating">
+            <legend>How well did you remember this card?</legend>
+            <div className="dh-study-rating-options">
             {[{l:"Again",c:"bg-red-500 hover:bg-red-600",r:0},{l:"Hard",c:"bg-orange-400 hover:bg-orange-500",r:1},{l:"Good",c:"bg-blue-500 hover:bg-blue-600",r:2},{l:"Easy",c:"bg-green-500 hover:bg-green-600",r:3}].map(b=>(
-              <button key={b.r} onClick={()=>onRate(b.r)} className={(b.c) + " text-white font-semibold px-5 py-2 rounded-xl text-sm"}>{b.l}</button>
+              <button type="button" key={b.r} onClick={()=>onRate(b.r)} aria-label={`Rate this card ${b.l}`} className={"dh-study-rating-button dh-study-rating-" + b.l.toLowerCase()}>{b.l}</button>
             ))}
-          </div>
-          <div className="w-full max-w-md">
-            {editNote?(<div className="flex gap-2"><input autoFocus className="flex-1 border border-amber-300 rounded-xl px-3 py-1.5 text-sm focus:outline-none" placeholder="Add mnemonic…" value={noteVal} onChange={e=>setNoteVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveNote()}/><button onClick={saveNote} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">Save</button></div>)
-            :(<button onClick={e=>{e.stopPropagation();setEditNote(true);}} className="text-xs text-amber-600 hover:text-amber-700">📝 {card.note?"Edit note":"Add mnemonic note"}</button>)}
+            </div>
+          </fieldset>
+          <div className="dh-study-note-control">
+            {editNote?(<div className="dh-study-note-editor"><input autoFocus aria-label="Mnemonic note" className="dh-study-note-input" placeholder="Add mnemonic…" value={noteVal} onChange={e=>setNoteVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveNote()}/><button type="button" onClick={saveNote} className="dh-study-note-save">Save note</button></div>)
+            :(<button type="button" onClick={e=>{e.stopPropagation();setEditNote(true);}} aria-label={card.note?"Edit mnemonic note":"Add mnemonic note"} className="dh-study-note-button">{card.note?"Edit note":"Add mnemonic note"}</button>)}
           </div>
         </>
       )}
-      {!flipped&&<p className="text-gray-400 text-sm">Tap the card to reveal</p>}
+      <p className="sr-only" role="status" aria-live="polite">{flipped?`Answer revealed: ${card.back}`:"Answer hidden"}</p>
     </div>
   );
 }
@@ -773,17 +700,17 @@ export function QuizMode({deck,onBack,addXP}) {
   const opts=useMemo(()=>{if(!q)return[];const w=cards.filter(c=>c.id!==q.id).sort(()=>Math.random()-0.5).slice(0,3);return [...w,q].sort(()=>Math.random()-0.5);},[idx]);
   const pick=(opt)=>{if(chosen)return;setChosen(opt.id);if(opt.id===q.id){setScore(s=>s+1);addXP(15);}};
   const next=()=>{setChosen(null);if(idx+1>=cards.length)setDone(true);else setIdx(i=>i+1);};
-  if(cards.length<4)return <div className="text-center py-12 text-gray-400"><p className="text-3xl mb-2">🃏</p><p className="text-sm">Need at least 4 cards.</p><button onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
+  if(cards.length<4)return <div className="text-center py-12 text-gray-400"><p className="text-3xl mb-2">🃏</p><p className="text-sm">Need at least 4 cards.</p><button type="button" aria-label="Back from quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
   if(done)return(
     <div className="flex flex-col gap-4 items-center text-center">
       <div className="bg-white rounded-2xl shadow border p-8 w-full"><p className="text-4xl mb-3">{score===cards.length?"🏆":score>cards.length/2?"😊":"💪"}</p><p className="font-extrabold text-2xl text-gray-800">{score}/{cards.length}</p><p className="text-sm text-gray-500">{Math.round(score/cards.length*100)}% correct</p></div>
       <button onClick={()=>{setIdx(0);setScore(0);setDone(false);setChosen(null);}} className="w-full bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm">🔁 Retry</button>
-      <button onClick={onBack} className="w-full border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back</button>
+      <button type="button" aria-label="Back from quiz results" onClick={onBack} className="w-full border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back</button>
     </div>
   );
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2"><button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">Quiz &middot; {deck.name}</p><span className="text-xs text-gray-400">{idx+1}/{cards.length}</span></div>
+      <div className="flex items-center gap-2"><button type="button" aria-label="Back from quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">Quiz &middot; {deck.name}</p><span className="text-xs text-gray-400">{idx+1}/{cards.length}</span></div>
       <div className="w-full bg-gray-200 rounded-full h-1.5"><div className="bg-purple-500 h-1.5 rounded-full" style={{width: ((idx/cards.length)*100) + "%"}}/></div>
       <div className="bg-white rounded-2xl shadow border p-6 text-center"><p className="text-xs text-gray-400 uppercase tracking-widest mb-2">What is the German for…</p><p className="text-2xl font-bold text-gray-800">{q.front}</p></div>
       <div className="grid grid-cols-2 gap-2">
@@ -805,7 +732,7 @@ export function WritingPractice({deck,onBack,addXP}) {
   if(!q)return null;
   return(
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2"><button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">✍️ Writing &middot; {deck.name}</p><span className="text-xs text-green-600 font-bold">✓ {score}</span></div>
+      <div className="flex items-center gap-2"><button type="button" aria-label="Back from writing practice" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">✍️ Writing &middot; {deck.name}</p><span className="text-xs text-green-600 font-bold">✓ {score}</span></div>
       <div className="bg-white rounded-2xl shadow border p-6 text-center"><p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Translate to German</p><p className="text-2xl font-bold text-gray-800 mb-1">{q.front}</p><p className="text-xs text-gray-400 italic">{q.exampleEn}</p></div>
       <div className="flex gap-2"><input ref={ref} className={"flex-1 border-2 rounded-xl px-4 py-3 text-base focus:outline-none " + (result===null?"border-gray-200 focus:border-blue-400":result?"border-green-400":"border-red-400")} placeholder="Type the German word…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(result===null?check():setIdx(i=>(i+1)%cards.length))} disabled={result!==null}/>{result===null&&<button onClick={check} className="bg-blue-600 text-white font-bold px-4 rounded-xl">Check</button>}</div>
       {result!==null&&<div className={"rounded-2xl p-4 " + (result?"bg-green-50 border border-green-200":"bg-red-50 border border-red-200")}><div className="flex items-center gap-2 mb-2"><span className="text-xl">{result?"✅":"❌"}</span><span className={"font-bold text-sm " + (result?"text-green-700":"text-red-700")}>{result?"Correct! +20 XP":"Not quite"}</span></div><div className="text-sm mb-1">{renderDiff()}</div><p className="text-xs text-gray-500 mt-1 italic">{q.exampleDe}</p><div className="flex gap-2 mt-3"><SpeakBtn text={q.back}/><button onClick={()=>setIdx(i=>(i+1)%cards.length)} className="ml-auto text-xs bg-blue-600 text-white px-4 py-1.5 rounded-xl font-bold">Next →</button></div></div>}
@@ -822,24 +749,33 @@ export function SRSSession({deck,onBack,onUpdateDeck,addXP,addStreak}) {
   const setNote=(cid,note)=>onUpdateDeck({...deck,cards:deck.cards.map(c=>c.id===cid?{...c,note}:c)});
   const handleRate=(r)=>{const card=queue[idx];const updated=sm2(card,r);onUpdateDeck({...deck,cards:deck.cards.map(c=>c.id===card.id?updated:c)});const xp=xpFor(r);addXP(xp);setSessionXP(s=>s+xp);setScores(s=>({...s,[r]:s[r]+1}));if(idx+1>=queue.length){setDone(true);addStreak();}else setIdx(i=>i+1);};
   const total=Object.values(scores).reduce((a,b)=>a+b,0);
-  if(queue.length===0)return(<div className="flex flex-col gap-4 text-center"><div className="bg-white rounded-2xl shadow border p-8"><p className="text-4xl mb-3">🎉</p><p className="font-bold text-gray-800 text-lg">All caught up!</p><p className="text-sm text-gray-400 mt-1">No cards due right now.</p></div><button onClick={onBack} className="border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back</button></div>);
-  if(done)return(<div className="flex flex-col gap-4"><div className="bg-white rounded-2xl shadow border p-6 text-center"><p className="text-4xl mb-2">🎉</p><p className="font-bold text-gray-800 text-lg">Session complete!</p><p className="text-sm text-green-600 font-bold mt-1">+{sessionXP} XP earned</p></div><div className="bg-white rounded-2xl p-4 shadow border"><p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Results &middot; {total} cards</p><div className="grid grid-cols-4 gap-2">{[{k:0,l:"Again",c:"bg-red-400",t:"text-red-700"},{k:1,l:"Hard",c:"bg-orange-400",t:"text-orange-700"},{k:2,l:"Good",c:"bg-blue-400",t:"text-blue-700"},{k:3,l:"Easy",c:"bg-green-400",t:"text-green-700"}].map(x=><div key={x.k} className="flex flex-col items-center gap-1"><div className={(x.c) + " rounded-xl w-full text-center text-white font-bold text-xl py-2"}>{scores[x.k]}</div><span className={"text-xs font-semibold " + (x.t)}>{x.l}</span></div>)}</div></div><button onClick={onBack} className="border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">← Back to Library</button></div>);
+  const studyTitle=`${deck.name} study session`;
+  const studyId="dh-study-title";
+  const renderStudyHeader=(meta)=><div className="dh-study-header">
+    <button type="button" aria-label="Exit study" onClick={onBack} className="dh-study-back">← <span>Exit</span></button>
+    <div className="dh-study-header-copy"><h2 id={studyId}>{studyTitle}</h2><p>{meta}</p></div>
+    {sessionXP>0&&<span className="dh-study-xp">+{sessionXP} XP</span>}
+  </div>;
+  if(queue.length===0)return(<section className="dh-study" aria-labelledby={studyId}>{renderStudyHeader("No cards due") }<div className="dh-study-state" role="status"><p className="dh-study-state-kicker">Ready when you are</p><h3>All caught up</h3><p>No cards are due right now.</p></div><button type="button" onClick={onBack} className="dh-study-secondary-action">Back to library</button></section>);
+  if(done)return(<section className="dh-study" aria-labelledby={studyId}>{renderStudyHeader("Session complete") }<div className="dh-study-state dh-study-complete" role="status"><p className="dh-study-state-kicker">Session complete</p><h3>Good work.</h3><p>{total} {total===1?"card":"cards"} reviewed · <strong>+{sessionXP} XP</strong></p></div><div className="dh-study-results" aria-label="Study results"><p>Review results</p><div className="dh-study-result-grid">{[{k:0,l:"Again",c:"again"},{k:1,l:"Hard",c:"hard"},{k:2,l:"Good",c:"good"},{k:3,l:"Easy",c:"easy"}].map(x=><div key={x.k} className={"dh-study-result dh-study-result-"+x.c}><strong>{scores[x.k]}</strong><span>{x.l}</span></div>)}</div></div><button type="button" onClick={onBack} className="dh-study-secondary-action">Back to library</button></section>);
   const card=queue[idx];
-  return(<div className="flex flex-col gap-4"><div className="flex items-center gap-2"><button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><div className="flex-1"><p className="font-bold text-gray-800 text-sm">{deck.name}</p><p className="text-xs text-gray-400">{queue.length-idx} cards due</p></div><span className="text-xs text-green-600 font-bold">+{sessionXP} XP</span></div><div className="w-full bg-gray-200 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{width:`${(idx/queue.length)*100}%`}}/></div><Flashcard card={card} onRate={handleRate} setNote={setNote}/></div>);
+  const progress=Math.round(((idx+1)/queue.length)*100);
+  return(<section className="dh-study" aria-labelledby={studyId}>{renderStudyHeader(`${idx+1} of ${queue.length} cards`) }<div className="dh-study-progress-row"><span>Progress</span><span>{progress}%</span></div><div className="dh-study-progress" role="progressbar" aria-label="Study progress" aria-valuemin="0" aria-valuemax={queue.length} aria-valuenow={idx+1}><span style={{width:progress+"%"}}/></div><div className="dh-study-stage"><Flashcard card={card} onRate={handleRate} setNote={setNote}/></div></section>);
 }
 
 // ── CARD MODAL ────────────────────────────────────────────────
 export function CardModal({card,onSave,onClose}) {
   const [f,setF]=useState(card||{front:"",back:"",gender:"der",plural:"",exampleDe:"",exampleEn:"",note:""});
+  const { dialogRef } = useDialogA11y({ onClose });
   return(
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-        <h3 className="font-bold text-gray-800 mb-4">{card?"✏️ Edit Card":"➕ New Card"}</h3>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="card-dialog-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+        <h3 id="card-dialog-title" className="font-bold text-gray-800 mb-4">{card?"✏️ Edit Card":"➕ New Card"}</h3>
         {[["English","front"],["German (with article)","back"],["Plural","plural"],["Example (DE)","exampleDe"],["Example (EN)","exampleEn"],["Mnemonic note","note"]].map(([label,key])=>(
-          <div key={key} className="mb-3"><label className="text-xs text-gray-500 font-semibold uppercase">{label}</label><input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300" value={f[key]||""} onChange={e=>setF(p=>({...p,[key]:e.target.value}))}/></div>
+          <div key={key} className="mb-3"><label className="text-xs text-gray-500 font-semibold uppercase" htmlFor={`card-${key}`}>{label}</label><input id={`card-${key}`} data-dialog-initial-focus={key==="front"?"true":undefined} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-300" value={f[key]||""} onChange={e=>setF(p=>({...p,[key]:e.target.value}))}/></div>
         ))}
         <div className="mb-4"><label className="text-xs text-gray-500 font-semibold uppercase">Gender</label><div className="flex gap-2 mt-1">{["der","die","das","verb"].map(g=><button key={g} onClick={()=>setF(p=>({...p,gender:g}))} className={"flex-1 py-1.5 rounded-lg text-xs font-bold border " + (f.gender===g?GS[g].badge+" border-transparent":"bg-gray-100 text-gray-500 border-gray-200")}>{g}</button>)}</div></div>
-        <div className="flex gap-2"><button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500">Cancel</button><button onClick={()=>{if(f.front&&f.back)onSave(f);}} className="flex-1 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">Save</button></div>
+        <div className="flex gap-2"><button type="button" aria-label="Close card dialog" onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-500">Cancel</button><button type="button" onClick={()=>{if(f.front&&f.back)onSave(f);}} className="flex-1 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm">Save</button></div>
       </div>
     </div>
   );
@@ -880,7 +816,7 @@ function GrammarPanel({level}) {
 
 // ── DECK DETAIL ───────────────────────────────────────────────
 // ── LIBRARY ───────────────────────────────────────────────────
-function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
+function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel, onFocusedModeChange}) {
   const [openId,setOpenId]=useState(null);
 
   useEffect(() => {
@@ -898,6 +834,8 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
   const [importCode,setImportCode]=useState("");
   const [importErr,setImportErr]=useState("");
   const [importing,setImporting]=useState(false);
+  const { dialogRef: importDialogRef } = useDialogA11y({ open: importModal, onClose: ()=>setImportModal(false) });
+  const { dialogRef: deleteDialogRef } = useDialogA11y({ open: Boolean(confirmDel), onClose: ()=>setConfirmDel(null) });
 
   const openDeck=library.find(d=>d.id===openId);
   const addDeck = () => { const d = { id: uid(), name: "New Deck " + (library.length + 1), level: "A1", cards: [], created: Date.now() }; setLibrary(l => [...l, d]); setOpenId(d.id); };
@@ -917,7 +855,7 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
     setImporting(false);
   };
 
-  if(openDeck)return <DeckDetail deck={openDeck} setLibrary={setLibrary} onBack={()=>setOpenId(null)} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} deps={{ uid, today, isWeak, isDue, DB, generateAIFlashcards, generateAITutorResponse, CardModal, SRSSession, QuizMode, WritingPractice, ListeningQuiz, publishPublicDeck: DB.publishPublicDeck.bind(DB) }}/>;
+  if(openDeck)return <DeckDetail deck={openDeck} setLibrary={setLibrary} onBack={()=>{setOpenId(null);onFocusedModeChange?.(false);}} onFocusedModeChange={onFocusedModeChange} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} deps={{ uid, today, isWeak, isDue, DB, generateAIFlashcards, generateAITutorResponse, CardModal, SRSSession, QuizMode, WritingPractice, ListeningQuiz, publishPublicDeck: DB.publishPublicDeck.bind(DB) }}/>;
 
   return(
     <div className="flex flex-col gap-4">
@@ -949,9 +887,9 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={()=>{setEditId(deck.id);setNewName(deck.name);}} className="text-xs px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✏️</button>
-                  <button onClick={()=>setConfirmDel(deck.id)} className="text-xs px-2 py-1.5 rounded-lg bg-red-100 text-red-500 hover:bg-red-200">🗑</button>
-                  <button onClick={()=>setOpenId(deck.id)} className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 border border-blue-200">Open →</button>
+                  <button type="button" aria-label={`Edit ${deck.name}`} onClick={()=>{setEditId(deck.id);setNewName(deck.name);}} className="text-xs px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✏️</button>
+                  <button type="button" aria-label={`Delete ${deck.name}`} onClick={()=>setConfirmDel(deck.id)} className="text-xs px-2 py-1.5 rounded-lg bg-red-100 text-red-500 hover:bg-red-200">🗑</button>
+                  <button type="button" onClick={()=>setOpenId(deck.id)} className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 border border-blue-200">Open →</button>
                 </div>
               </div>
               {deck.cards.length>0&&<div className="px-4 pb-3">
@@ -966,13 +904,13 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
 
       {importModal&&(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>setImportModal(false)}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={e=>e.stopPropagation()}>
-            <h3 className="font-bold text-gray-800 mb-3">📥 Import Deck</h3>
+          <div ref={importDialogRef} role="dialog" aria-modal="true" aria-labelledby="import-dialog-title" className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={e=>e.stopPropagation()}>
+            <h3 id="import-dialog-title" className="font-bold text-gray-800 mb-3">📥 Import Deck</h3>
             <p className="text-xs text-gray-400 mb-3">Paste a shared deck code below</p>
-            <input className="w-full border border-gray-200 rounded-xl px-3 py-3 text-base font-bold text-center uppercase tracking-widest focus:outline-none" placeholder="e.g. X9K2A1" value={importCode} onChange={e=>setImportCode(e.target.value)}/>
-            {importErr&&<p className="text-xs text-red-500 mt-1 text-center font-bold">{importErr}</p>}
+            <input data-dialog-initial-focus="true" aria-label="Shared deck code" className="w-full border border-gray-200 rounded-xl px-3 py-3 text-base font-bold text-center uppercase tracking-widest focus:outline-none" placeholder="e.g. X9K2A1" value={importCode} onChange={e=>setImportCode(e.target.value)}/>
+            {importErr&&<p role="alert" className="text-xs text-red-500 mt-1 text-center font-bold">{importErr}</p>}
             <div className="flex gap-2 mt-3">
-              <button onClick={()=>setImportModal(false)} className="flex-1 py-2 border rounded-xl text-sm text-gray-500">Cancel</button>
+              <button type="button" aria-label="Close import dialog" onClick={()=>setImportModal(false)} className="flex-1 py-2 border rounded-xl text-sm text-gray-500">Cancel</button>
               <button onClick={importDeck} disabled={importing} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold disabled:opacity-50">{importing?"Importing...":"Import"}</button>
             </div>
           </div>
@@ -980,9 +918,10 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel}) {
       )}
       {confirmDel&&(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>setConfirmDel(null)}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-xs w-full text-center" onClick={e=>e.stopPropagation()}>
+          <div ref={deleteDialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" className="bg-white rounded-2xl p-6 shadow-2xl max-w-xs w-full text-center" onClick={e=>e.stopPropagation()}>
+            <h3 id="delete-dialog-title" className="sr-only">Delete deck confirmation</h3>
             <p className="text-2xl mb-2">🗑️</p><p className="font-bold text-gray-800 mb-1">Delete this deck?</p><p className="text-xs text-gray-400 mb-4">This cannot be undone.</p>
-            <div className="flex gap-2"><button onClick={()=>setConfirmDel(null)} className="flex-1 py-2 rounded-xl border text-sm text-gray-500">Cancel</button><button onClick={()=>delDeck(confirmDel)} className="flex-1 py-2 rounded-xl bg-red-500 text-white font-bold text-sm">Delete</button></div>
+            <div className="flex gap-2"><button type="button" data-dialog-initial-focus="true" onClick={()=>setConfirmDel(null)} className="flex-1 py-2 rounded-xl border text-sm text-gray-500">Cancel</button><button type="button" onClick={()=>delDeck(confirmDel)} className="flex-1 py-2 rounded-xl bg-red-500 text-white font-bold text-sm">Delete</button></div>
           </div>
         </div>
       )}
@@ -1027,7 +966,7 @@ function GeneratePanel({level,library,setLibrary,user,setUser}) {
         consumeRateLimit();
       }
       else setError("No cards parsed. Try a simpler prompt.");
-    }catch(e){setError(`Failed: ${e.message}`);}
+    }catch(e){setError(getAIUserMessage(e));}
     setLoading(false);
   };
 
@@ -1043,7 +982,7 @@ function GeneratePanel({level,library,setLibrary,user,setUser}) {
         setImportMode(false);
         consumeRateLimit();
       }else setError("Could not parse import.");
-    }catch(e){setError(`Failed: ${e.message}`);}
+    }catch(e){setError(getAIUserMessage(e));}
     setLoading(false);
   };
 
@@ -1065,7 +1004,8 @@ function GeneratePanel({level,library,setLibrary,user,setUser}) {
           <><div className="flex gap-2 mb-2"><input className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder={`e.g. "10 ${level} food vocabulary cards"`} value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&generate()}/><button onClick={generate} disabled={loading} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-sm">{loading?"…":"Go"}</button></div>
           <div className="flex flex-wrap gap-1">{[`10 ${level} noun cards`,`${level} separable verbs`,`5 ${level} adjective cards`,`${level} weather vocab`].map(ex=><button key={ex} onClick={()=>setPrompt(ex)} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg px-2 py-1">{ex}</button>)}</div></>
         )}
-        {error&&<p className="text-xs mt-2 text-red-500 font-bold">{error}</p>}
+        {loading&&<p role="status" aria-live="polite" className="sr-only">Generating flashcards…</p>}
+        {error&&<p role="alert" className="text-xs mt-2 text-red-500 font-bold">{error}</p>}
       </div>
       {preview.length>0&&(
         <div className="bg-white rounded-2xl shadow border overflow-hidden">
@@ -1186,7 +1126,7 @@ function SupportCard() {
 
 
 // ── STATS VIEW ────────────────────────────────────────────────
-function StatsView({library,xp,streak,goal,setGoal,dailyDone,history,user,onSignOut,installPrompt,setInstallPrompt}) {
+function StatsView({library,xp,streak,goal,setGoal,dailyDone,history,user,onSignOut,installPrompt,setInstallPrompt,themePreference,setThemePreference}) {
   const handleInstall = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -1234,6 +1174,14 @@ function StatsView({library,xp,streak,goal,setGoal,dailyDone,history,user,onSign
         </div>
         <div className="flex items-center justify-between mb-1"><span className="text-xs text-gray-500">{xp} XP</span><span className="text-xs text-gray-500">{nextBadge.xp>xp?`${nextBadge.xp-xp} to ${nextBadge.icon}`:"Max! 🌟"}</span></div>
         <div className="w-full bg-gray-100 rounded-full h-2"><div className="bg-purple-500 h-2 rounded-full transition-all" style={{width:`${pct}%`}}/></div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <label htmlFor="theme-preference" className="text-xs font-semibold text-gray-500">Theme</label>
+          <select id="theme-preference" aria-label="Theme preference" value={themePreference} onChange={e=>setThemePreference(e.target.value)} className="border border-gray-200 bg-white text-gray-700 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value={THEME_PREFERENCES.SYSTEM}>System</option>
+            <option value={THEME_PREFERENCES.LIGHT}>Light</option>
+            <option value={THEME_PREFERENCES.DARK}>Dark</option>
+          </select>
+        </div>
       </div>
 
       {/* Streak Calendar */}
@@ -1308,7 +1256,7 @@ export function AITutor({deck, onClose}) {
       } else {
         setResponse(res);
       }
-    } catch(e) { setError(e.message); }
+    } catch(e) { setError(getAIUserMessage(e)); }
     setLoading(false);
   };
 
@@ -1318,7 +1266,7 @@ export function AITutor({deck, onClose}) {
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div>
             <h3 className="font-extrabold text-gray-800">🤖 AI Tutor</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Powered by LLaMA 3.1</p>
+            <p className="text-xs text-gray-400 mt-0.5">Powered by Groq</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
         </div>
@@ -1500,6 +1448,7 @@ function LearningPathModal({user, currentGoal, onSave, onClose}) {
   const [targetLevel, setTargetLevel] = useState(currentGoal?.targetLevel || "B1");
   const [timeframe, setTimeframe] = useState(currentGoal?.timeframe || 60);
   const [saving, setSaving] = useState(false);
+  const { dialogRef } = useDialogA11y({ onClose });
 
   const dailyCardTarget = Math.max(5, Math.round(timeframe < 30 ? 20 : timeframe < 60 ? 15 : 10));
   const dailyRevTarget  = Math.max(10, dailyCardTarget * 2);
@@ -1521,16 +1470,16 @@ function LearningPathModal({user, currentGoal, onSave, onClose}) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={e=>e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="learning-goal-dialog-title" className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-extrabold text-gray-800 text-base">🎯 Set Learning Goal</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+          <h3 id="learning-goal-dialog-title" className="font-extrabold text-gray-800 text-base">🎯 Set Learning Goal</h3>
+          <button type="button" aria-label="Close learning goal dialog" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
 
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Target Level</p>
         <div className="grid grid-cols-3 gap-2 mb-4">
           {LEVEL_ORDER.map(l => (
-            <button key={l} onClick={() => setTargetLevel(l)}
+            <button type="button" data-dialog-initial-focus={l===LEVEL_ORDER[0]?"true":undefined} key={l} onClick={() => setTargetLevel(l)}
               className={"py-2 rounded-xl text-sm font-bold border-2 transition-all " + (targetLevel===l ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-500 hover:border-blue-200")}>
               {l}
             </button>
@@ -1540,7 +1489,7 @@ function LearningPathModal({user, currentGoal, onSave, onClose}) {
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Timeframe</p>
         <div className="grid grid-cols-3 gap-2 mb-5">
           {[30, 60, 90].map(t => (
-            <button key={t} onClick={() => setTimeframe(t)}
+            <button type="button" key={t} onClick={() => setTimeframe(t)}
               className={"py-2 rounded-xl text-sm font-bold border-2 transition-all " + (timeframe===t ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 bg-white text-gray-500 hover:border-indigo-200")}>
               {t} days
             </button>
@@ -1554,7 +1503,7 @@ function LearningPathModal({user, currentGoal, onSave, onClose}) {
           <p className="mt-1 opacity-70">Reach <strong>{targetLevel}</strong> in <strong>{timeframe} days</strong></p>
         </div>
 
-        <button onClick={handleSave} disabled={saving}
+        <button type="button" onClick={handleSave} disabled={saving}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm disabled:opacity-50 transition-colors">
           {saving ? "Saving…" : currentGoal ? "Update Goal" : "Start Learning Path"}
         </button>
@@ -1671,7 +1620,11 @@ function HomeTab({library,addXP,setNav,user,xp,streak,dailyDone,userGoal,setUser
 // MAIN APP
 // ═══════════════════════════════════════════════════════════
 export default function App() {
-  const [authState,setAuthState]=useState("loading"); // loading|unauth|onboarding|app
+  const [authState,setAuthState]=useState("booting"); // booting|unauth|authenticating|profile_loading|profile_load_error|onboarding|app
+  const [authError,setAuthError]=useState(null);
+  const [profileError,setProfileError]=useState(null);
+  const [firebaseUser,setFirebaseUser]=useState(null);
+  const signOutInFlight = useRef(false);
   const [userGoal,setUserGoal]=useState(null);
   const [user,setUser]=useState(null);
   const [level,setLevel]=useState("A1");
@@ -1685,6 +1638,71 @@ export default function App() {
   const [history,setHistory]=useState([]); // array of datestrings studied
   const [missions,setMissions]=useState([]); // daily mission states
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [focusedMode, setFocusedMode] = useState(false);
+  const [themePreference,setThemePreference]=useState(()=>getStoredThemePreference());
+
+  const loadAuthenticatedProfile = useCallback(async (fbUser) => {
+    setAuthError(null);
+    setProfileError(null);
+    setAuthState("profile_loading");
+
+    try {
+      const profileResult = await DB.getUser(fbUser.uid);
+
+      if (profileResult.status === PROFILE_STATES.READ_ERROR) {
+        console.error("Unable to load the authenticated user profile", profileResult.error);
+        setProfileError({ message: "We couldn't load your profile. Your data hasn't been changed. Try again." });
+        setAuthState("profile_load_error");
+        return;
+      }
+
+      if (profileResult.status === PROFILE_STATES.NOT_FOUND) {
+        setUser({ uid: fbUser.uid, name: fbUser.displayName || "", email: fbUser.email, avatar: fbUser.displayName?.[0]?.toUpperCase() || "🧑" });
+        setAuthState("onboarding");
+        return;
+      }
+
+      const userData = profileResult.data;
+      setUser(userData);
+      setLevel(userData.level || "A1");
+      setGoal(userData.goal || 20);
+      setXp(userData.xp || 0);
+      setStreak(userData.streak || 0);
+      setHistory(userData.history || []);
+      const lib = await DB.getLibrary(fbUser.uid);
+      setLibRaw(lib);
+      const ug = await DB.getUserGoal(fbUser.uid);
+      if (ug) setUserGoal(ug);
+      const ms = await DB.getMissions(fbUser.uid);
+      if (ms && ms.date === new Date().toDateString()) setMissions(ms.missions || []);
+      else setMissions([]);
+      setAuthState("app");
+    } catch (error) {
+      console.error("Unexpected authenticated profile load failure", error);
+      setProfileError({ message: "We couldn't load your profile. Your data hasn't been changed. Try again." });
+      setAuthState("profile_load_error");
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const syncTheme = () => applyTheme(themePreference);
+    syncTheme();
+
+    if (themePreference !== THEME_PREFERENCES.SYSTEM || typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = () => syncTheme();
+    if (mediaQuery.addEventListener) mediaQuery.addEventListener("change", handleSystemThemeChange);
+    else mediaQuery.addListener?.(handleSystemThemeChange);
+    return () => {
+      if (mediaQuery.removeEventListener) mediaQuery.removeEventListener("change", handleSystemThemeChange);
+      else mediaQuery.removeListener?.(handleSystemThemeChange);
+    };
+  }, [themePreference]);
+
+  const handleThemePreference = (preference) => {
+    const normalized = saveThemePreference(preference);
+    setThemePreference(normalized);
+  };
 
   useEffect(() => {
     const handler = (e) => {
@@ -1696,39 +1714,46 @@ export default function App() {
   }, []);
 
   useEffect(()=>{
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        let userData = await DB.getUser(fbUser.uid);
-        if (!userData) {
-          setUser({ uid: fbUser.uid, name: fbUser.displayName || "", email: fbUser.email, avatar: fbUser.displayName?.[0]?.toUpperCase() || "🧑" });
-          setAuthState("onboarding"); 
+    const unsub = authService.subscribeToAuthState(
+      fbUser => {
+        setFirebaseUser(fbUser);
+        if (fbUser) {
+          setNav("home");
+          void loadAuthenticatedProfile(fbUser);
         } else {
-          setUser(userData);
-          setLevel(userData.level || "A1");
-          setGoal(userData.goal || 20);
-          setXp(userData.xp || 0);
-          setStreak(userData.streak || 0);
-          setHistory(userData.history || []);
-          const lib = await DB.getLibrary(fbUser.uid);
-          setLibRaw(lib);
-          const ug = await DB.getUserGoal(fbUser.uid);
-          if(ug) setUserGoal(ug);
-          const ms = await DB.getMissions(fbUser.uid);
-          if(ms && ms.date === new Date().toDateString()) setMissions(ms.missions || []);
-          else setMissions([]);
-          setAuthState("app");
+          setUser(null); setLibRaw([]); setXp(0); setStreak(0); setHistory([]); setUserGoal(null); setMissions([]); setAuthError(null); setProfileError(null); setAuthState("unauth");
         }
-      } else {
-         setUser(null); setLibRaw([]); setXp(0); setStreak(0); setHistory([]); setUserGoal(null); setMissions([]); setAuthState("unauth");
-      }
-    });
+      },
+      error => {
+        setFirebaseUser(null);
+        setAuthError(error);
+        setAuthState("auth_error");
+      },
+    );
     return unsub;
-  },[]);
-
-  const handleDemo=()=>{ /* no-op in real mode */ };
+  },[loadAuthenticatedProfile]);
   
   const handleGoogle=async ()=>{
-    try { await signInWithPopup(auth, googleProvider); } catch(e) { console.error(e); }
+    if (authState === "authenticating") return;
+    setAuthError(null);
+    setAuthState("authenticating");
+    try {
+      await authService.signInWithGoogle();
+    } catch (error) {
+      setAuthError(normalizeAuthError(error));
+      setAuthState("unauth");
+    }
+  };
+
+  const handleCancelGoogle=()=>{
+    if (authState !== "authenticating") return;
+    authService.cancelGoogleSignIn();
+    setAuthError(normalizeAuthError({ code: "auth/popup-closed-by-user" }));
+    setAuthState("unauth");
+  };
+
+  const retryProfileLoad=()=>{
+    if(firebaseUser) void loadAuthenticatedProfile(firebaseUser);
   };
   
   const handleOnboardingComplete=async ({name,level:lv,goal:g})=>{
@@ -1742,7 +1767,19 @@ export default function App() {
     setAuthState("app");
   };
   
-  const handleSignOut=()=>{ fbSignOut(auth); };
+  const handleSignOut=async ()=>{
+    if(signOutInFlight.current || authState === "signing_out") return;
+    signOutInFlight.current = true;
+    setAuthState("signing_out");
+    try {
+      await authService.signOutUser();
+    } catch (error) {
+      setAuthError(normalizeAuthError(error));
+      setAuthState("app");
+    } finally {
+      signOutInFlight.current = false;
+    }
+  };
 
   const setLibrary=useCallback((action)=>{
     setLibRaw(prev=>{
@@ -1787,66 +1824,52 @@ export default function App() {
     addXP(def.xpReward);
   },[user, addXP]);
 
-  const badge=getBadge(xp);
-  const goalPct=Math.min(100,Math.round((dailyDone/Math.max(1,goal))*100));
-
-
-  if(authState==="loading") return (
+  if(["booting", "authenticated", "profile_loading", "signing_out"].includes(authState)) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
       <div className="text-center text-white"><p className="text-5xl mb-4">🇩🇪</p><p className="text-xl font-extrabold">Deutsch Hub</p><p className="text-sm opacity-70 mt-1">Loading…</p></div>
     </div>
   );
-  if(authState==="unauth") return <AuthScreen onDemo={handleDemo} onGoogle={handleGoogle}/>;
-  if(authState==="onboarding") return <Onboarding onComplete={handleOnboardingComplete}/>;
-
-  return(
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 font-sans">
-      <div className="max-w-lg mx-auto flex flex-col min-h-screen">
-        {/* Top bar */}
-        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 px-4 py-3">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-base font-extrabold text-gray-800 flex-1 tracking-tight">🇩🇪 Deutsch Hub</p>
-            <span title={badge.label} className="text-base">{badge.icon}</span>
-            <span className="text-xs font-bold text-purple-600">{xp} XP</span>
-            <span>🔥</span>
-            <span className="text-xs font-bold text-orange-500">{streak}</span>
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-              <div className={"h-1.5 rounded-full transition-all " + (goalPct>=100?"bg-green-500":"bg-blue-400")} style={{width:goalPct+"%"}}/>
-            </div>
-            <span className="text-xs text-gray-400 whitespace-nowrap">{dailyDone}/{goal} today</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-400 uppercase">CEFR Level:</span>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              className={"flex-1 border border-gray-200 bg-white text-gray-800 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-300 hover:border-gray-300 transition-colors cursor-pointer shadow-sm"}
-              title="This level controls AI difficulty"
-            >
-              {Object.keys(LEVELS).map(l=>(
-                <option key={l} value={l}>{LEVELS[l].label}</option>
-              ))}
-            </select>
-          </div>
+  if(authState==="unauth" || authState==="authenticating" || authState==="auth_error") return <AuthScreen onGoogle={handleGoogle} onCancelGoogle={handleCancelGoogle} googleLoading={authState === "authenticating"} authError={authError}/>;
+  if(authState==="profile_load_error") return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center">
+        <h1 className="text-xl font-extrabold text-gray-800">We couldn&apos;t load your profile</h1>
+        <p role="alert" className="text-sm text-gray-500 mt-3">{profileError?.message}</p>
+        <div className="flex gap-3 mt-6">
+          <button type="button" onClick={retryProfileLoad} className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-bold">Try again</button>
+          <button type="button" onClick={handleSignOut} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-bold">Sign out</button>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 p-4 pb-24">
-          {nav==="home"&&<HomeTab library={library} addXP={addXP} setNav={setNav} user={user} xp={xp} streak={streak} dailyDone={dailyDone} userGoal={userGoal} setUserGoal={setUserGoal} missions={missions} onClaimMission={onClaimMission}/>}
-          {nav==="generate"&&<GeneratePanel level={level} library={library} setLibrary={setLibrary} user={user} setUser={setUser}/>}
-          {nav==="library"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} setLevel={setLevel}/>}
-          {nav==="grammar"&&<GrammarPanel level={level}/>}
-          {nav==="explore"&&<ExploreTab library={library} setLibrary={setLibrary} user={user}/>}
-          {nav==="leaderboard"&&<Leaderboard currentUser={user}/>}
-          {nav==="stats"&&<StatsView library={library} xp={xp} streak={streak} goal={goal} setGoal={setGoal} dailyDone={dailyDone} history={history} user={user} onSignOut={handleSignOut} installPrompt={installPrompt} setInstallPrompt={setInstallPrompt}/>}
-        </div>
-
-        {/* Bottom nav */}
-        <BottomNav nav={nav} setNav={setNav} />
-
       </div>
     </div>
+  );
+  if(authState==="onboarding") return <Onboarding onComplete={handleOnboardingComplete}/>;
+
+  const pageTitle = { home: "Home", learn: "Learn", generate: "AI Generator", library: "Library", grammar: "Grammar", explore: "Explore", leaderboard: "Leaderboard", stats: "Profile" }[nav] || "Deutsch Hub";
+
+  return(
+    <AppShell
+      nav={nav}
+      setNav={setNav}
+      pageTitle={focusedMode === "srs" ? "Study" : pageTitle}
+      focusedMode={focusedMode}
+      header={(
+        <div className="dh-shell-context">
+          <div className="dh-shell-brand" aria-label="Deutsch Hub">
+            <span aria-hidden="true" className="dh-shell-brand-mark">D</span>
+            <span>Deutsch Hub</span>
+          </div>
+          <p className="dh-shell-page-context">{pageTitle}</p>
+        </div>
+      )}
+    >
+      {nav==="home"&&<HomeTab library={library} addXP={addXP} setNav={setNav} user={user} xp={xp} streak={streak} dailyDone={dailyDone} userGoal={userGoal} setUserGoal={setUserGoal} missions={missions} onClaimMission={onClaimMission}/>}
+      {nav==="generate"&&<GeneratePanel level={level} library={library} setLibrary={setLibrary} user={user} setUser={setUser}/>}
+      {nav==="learn"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
+      {nav==="library"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
+      {nav==="grammar"&&<GrammarPanel level={level}/>}
+      {nav==="explore"&&<ExploreTab library={library} setLibrary={setLibrary} user={user}/>}
+      {nav==="leaderboard"&&<Leaderboard currentUser={user}/>}
+      {nav==="stats"&&<StatsView library={library} xp={xp} streak={streak} goal={goal} setGoal={setGoal} dailyDone={dailyDone} history={history} user={user} onSignOut={handleSignOut} installPrompt={installPrompt} setInstallPrompt={setInstallPrompt} themePreference={themePreference} setThemePreference={handleThemePreference}/>}
+    </AppShell>
   );
 }

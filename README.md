@@ -1,24 +1,61 @@
 # 🇩🇪 Deutsch Hub
 
-Welcome to **Deutsch Hub**, a premium, AI-powered German language learning platform! This project combines spaced repetition (SRS), intelligent AI generation, and gamification to help you master German efficiently.
+Deutsch Hub is a React/Vite German-learning PWA for vocabulary acquisition, spaced-repetition review, AI-assisted card generation and tutoring, personal decks, community decks, browser TTS, goals and lightweight motivation.
 
-## 🔗 Live Demo
-[View Live Site](https://deutsch-hub-ea48a.web.app/)
+The product is functional and incrementally evolving. Firebase remains the authentication and Firestore platform, and a Cloudflare Worker remains the hosted Groq gateway. The current hosted AI model is `openai/gpt-oss-20b`.
 
-## ✨ Features
-*   **AI Flashcard Generation:** Generate custom flashcards instantly with Groq LLMs. Simply type what you want to learn or paste a list of words, and the AI handles translations, plural forms, and example sentences.
-*   **Spaced Repetition System (SRS):** Powered by the SM-2 algorithm to dynamically schedule your reviews based on your confidence level.
-*   **Interactive AI Tutor:** Get immediate, conversational answers to complex grammar questions without leaving your study session.
-*   **4 Study Modes:** Includes Classic Flashcards, Multiple Choice Quizzes, strict Writing practice, and Listening comprehension.
-*   **Gamification:** Track your streaks, earn XP, complete daily goals, and compete on the Global Leaderboard.
-*   **Community Sharing:** Publish your decks to the community or share them privately via 6-character shortcodes.
-*   **PWA Ready:** Install Deutsch Hub as a standalone app on your mobile or desktop device.
+## Current capabilities
 
-## 🛠️ Tech Stack
-- **Frontend:** React 19, Vite, Tailwind CSS
-- **Backend & DB:** Firebase Auth, Firestore Realtime Database
-- **AI Processing:** Groq SDK (Llama models), Google Generative AI
-- **API Security:** Cloudflare Workers proxy — AI API keys kept server-side, never exposed to client
+- Google sign-in, onboarding and cross-session Firestore persistence.
+- Personal decks with manual editing, notes, private share codes and public community publishing/import.
+- AI flashcard generation, text-list import and tutor explanation, sentence and correction modes.
+- Four learning modes: SRS review, multiple-choice quiz, writing practice and listening quiz.
+- German browser speech synthesis, grammar reference, word of the day, goals, missions, XP, streaks, badges and leaderboard.
+- Installable PWA shell through `public/manifest.json` and a registered service worker. Offline caching and synchronization are not implemented yet.
 
-## 📜 License
-This source code is made available for viewing and educational purposes only. See the [LICENSE](LICENSE) file for more information.
+## Technology
+
+- React 19, Vite 8 and Tailwind CSS 3.
+- Firebase Authentication with Google sign-in and Cloud Firestore.
+- Cloudflare Worker proxying hosted Groq requests; the Groq key stays server-side.
+- Browser Speech Synthesis, with a Vite-only Google TTS proxy for local development.
+- Native Node test runner for the current AI boundary tests.
+
+## Local development
+
+Install the existing dependencies, create a local `.env` file, and set:
+
+```text
+VITE_GROQ_PROXY_URL=https://<your-deployed-worker>
+```
+
+Do not commit `.env` files or provider secrets. Firebase web configuration is currently defined in `src/firebase.js`; verify the intended Firebase project before connecting a local build.
+
+Available scripts:
+
+```bash
+npm run dev
+npm test
+npm run lint
+npm run build
+npm run preview
+```
+
+The repository currently has known baseline lint findings outside the AI boundary. See the architecture and decision documents before treating lint as a clean quality gate.
+
+## Deployment
+
+Firebase Hosting serves `dist` according to `firebase.json` and rewrites application routes to `index.html`. The hosted AI path is the separately configured Cloudflare Worker under `cloudflare-proxy/`. Deployment credentials and the exact release workflow are not encoded as package scripts.
+
+## Documentation
+
+- [Product definition](docs/PRODUCT.md)
+- [Technical architecture](docs/ARCHITECTURE.md)
+- [AI architecture](docs/AI_ARCHITECTURE.md)
+- [Firestore data model](docs/DATA_MODEL.md)
+- [Design brief](docs/DESIGN_BRIEF.md) and [design system](docs/DESIGN_SYSTEM.md)
+- [Accessibility](docs/ACCESSIBILITY.md), [security](docs/SECURITY.md) and [performance](docs/PERFORMANCE.md)
+- [Roadmap](docs/ROADMAP.md) and [architecture decisions](docs/DECISIONS.md)
+- [Legacy feature inventory](FEATURES.md)
+
+Engineering constraints and non-negotiable project rules live in [AGENTS.md](AGENTS.md). Reusable procedures and role guidance live under `.agents/`.

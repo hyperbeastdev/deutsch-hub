@@ -1,0 +1,147 @@
+/*
+ * Deutsch Hub semantic visual foundation.
+ *
+ * Phase 1 establishes a warm-neutral learning workspace. Feature layouts still
+ * migrate independently; use these tokens rather than introducing new literal
+ * colors in later phases.
+ */
+:root {
+  color-scheme: light;
+
+  --dh-color-canvas: #f5f3ee;
+  --dh-color-surface: #fcfbf8;
+  --dh-color-surface-elevated: #ffffff;
+  --dh-color-surface-subtle: #f0eee8;
+  --dh-color-surface-hover: #e9e6de;
+  --dh-color-border: #e2ded4;
+  --dh-color-border-strong: #cbc5b8;
+  --dh-color-text-primary: #192334;
+  --dh-color-text-secondary: #536072;
+  --dh-color-text-muted: #7b8490;
+  --dh-color-accent: #1f4b6e;
+  --dh-color-accent-hover: #183d5a;
+  --dh-color-accent-solid: #1d4ed8;
+  --dh-color-accent-alt-solid: #7e22ce;
+  --dh-color-warm-solid: #c2410c;
+  --dh-color-accent-subtle: #e7eef3;
+  --dh-color-focus: #0e5e8c;
+  --dh-color-success: #2f7d5d;
+  --dh-color-success-solid: #15803d;
+  --dh-color-warning: #a86b1f;
+  --dh-color-warning-solid: #a16207;
+  --dh-color-error: #b54a42;
+  --dh-color-error-solid: #b91c1c;
+  --dh-color-error-strong-solid: #991b1b;
+  --dh-color-success-subtle: #e8f3ed;
+  --dh-color-warning-subtle: #f6eedf;
+  --dh-color-error-subtle: #faeae8;
+  --dh-color-disabled: #c8c3b8;
+
+  --dh-color-review-again: #b54a42;
+  --dh-color-review-hard: #a86b1f;
+  --dh-color-review-good: #1f4b6e;
+  --dh-color-review-easy: #2f7d5d;
+
+  --dh-color-cefr-a1: #2f7d5d;
+  --dh-color-cefr-a2: #1f4b6e;
+  --dh-color-cefr-b1: #a86b1f;
+  --dh-color-cefr-b2: #b54a42;
+  --dh-color-cefr-c1: #7563a8;
+  --dh-color-cefr-c2: #475569;
+
+  --dh-color-gender-der: #376ea5;
+  --dh-color-gender-die: #b45b69;
+  --dh-color-gender-das: #377f67;
+  --dh-color-gender-verb: #7563a8;
+
+  --dh-font-family-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dh-font-size-study-word: clamp(2.25rem, 5vw, 3rem);
+  --dh-font-size-page-title: clamp(1.625rem, 3vw, 2rem);
+  --dh-font-size-heading: 1.125rem;
+  --dh-font-size-body: 1rem;
+  --dh-font-size-metadata: 0.8125rem;
+  --dh-font-weight-regular: 400;
+  --dh-font-weight-semibold: 600;
+  --dh-font-weight-bold: 700;
+  --dh-font-weight-extrabold: 800;
+  --dh-line-height-tight: 1.2;
+  --dh-line-height-body: 1.5;
+  --dh-line-height-relaxed: 1.625;
+
+  --dh-space-1: 0.25rem;
+  --dh-space-2: 0.5rem;
+  --dh-space-3: 0.75rem;
+  --dh-space-4: 1rem;
+  --dh-space-5: 1.25rem;
+  --dh-space-6: 1.5rem;
+  --dh-space-8: 2rem;
+  --dh-space-10: 2.5rem;
+  --dh-space-12: 3rem;
+  --dh-space-16: 4rem;
+
+  --dh-radius-control: 0.5rem;
+  --dh-radius-surface: 0.75rem;
+  --dh-radius-dialog: 1rem;
+
+  --dh-elevation-low: 0 1px 2px rgb(25 35 52 / 0.04);
+  --dh-elevation-medium: 0 8px 20px rgb(25 35 52 / 0.08);
+  --dh-elevation-modal: 0 24px 60px rgb(25 35 52 / 0.18);
+
+  --dh-motion-standard: 180ms;
+  --dh-motion-reduced: 1ms;
+  --dh-motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --dh-color-canvas: #121416;
+  --dh-color-surface: #1a1d20;
+  --dh-color-surface-elevated: #23272b;
+  --dh-color-surface-subtle: #171a1d;
+  --dh-color-surface-hover: #2a2f34;
+  --dh-color-border: #34393e;
+  --dh-color-border-strong: #4a5056;
+  --dh-color-text-primary: #f1efea;
+  --dh-color-text-secondary: #c9c7c1;
+  --dh-color-text-muted: #9c9f9f;
+  --dh-color-accent: #8ab6d6;
+  --dh-color-accent-hover: #aed0e6;
+  --dh-color-accent-solid: #1d4ed8;
+  --dh-color-accent-alt-solid: #7e22ce;
+  --dh-color-warm-solid: #c2410c;
+  --dh-color-accent-subtle: #1f303b;
+  --dh-color-focus: #a8d0ed;
+  --dh-color-success: #8fcaa8;
+  --dh-color-success-solid: #166534;
+  --dh-color-warning: #e0b36a;
+  --dh-color-warning-solid: #a16207;
+  --dh-color-error: #ed9c91;
+  --dh-color-error-solid: #b91c1c;
+  --dh-color-error-strong-solid: #991b1b;
+  --dh-color-success-subtle: #1e3328;
+  --dh-color-warning-subtle: #392c19;
+  --dh-color-error-subtle: #382220;
+  --dh-color-disabled: #62676b;
+
+  --dh-color-review-again: #ed9c91;
+  --dh-color-review-hard: #e0b36a;
+  --dh-color-review-good: #8ab6d6;
+  --dh-color-review-easy: #8fcaa8;
+
+  --dh-color-cefr-a1: #8fcaa8;
+  --dh-color-cefr-a2: #8ab6d6;
+  --dh-color-cefr-b1: #e0b36a;
+  --dh-color-cefr-b2: #ed9c91;
+  --dh-color-cefr-c1: #c5b3e8;
+  --dh-color-cefr-c2: #c9c7c1;
+
+  --dh-color-gender-der: #91bce2;
+  --dh-color-gender-die: #ebaeb7;
+  --dh-color-gender-das: #8fcaa8;
+  --dh-color-gender-verb: #c5b3e8;
+
+  --dh-elevation-low: 0 1px 2px rgb(0 0 0 / 0.22);
+  --dh-elevation-medium: 0 8px 20px rgb(0 0 0 / 0.28);
+  --dh-elevation-modal: 0 24px 60px rgb(0 0 0 / 0.5);
+}

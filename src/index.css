@@ -18,9 +18,9 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: var(--dh-font-family-sans);
+  background: var(--dh-color-canvas);
+  color: var(--dh-color-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -47,10 +47,915 @@ pre {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb { background: var(--dh-color-border-strong); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dh-color-text-muted); }
 
 /* Smooth transitions globally */
 * { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+
+:focus-visible {
+  outline: 3px solid var(--dh-color-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *, *::before, *::after {
+    animation-duration: var(--dh-motion-reduced) !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: var(--dh-motion-reduced) !important;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Application shell
+   The shell establishes navigation and workspace structure. Feature screens
+   retain their existing layout until their dedicated migration phase.
+   ───────────────────────────────────────────── */
+
+.dh-shell {
+  min-height: 100svh;
+  background: var(--dh-color-canvas);
+  color: var(--dh-color-text-primary);
+}
+
+.dh-shell-layout {
+  min-height: 100svh;
+  display: flex;
+}
+
+.dh-shell-main {
+  min-width: 0;
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dh-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--dh-color-surface) 94%, transparent);
+  border-bottom: 1px solid var(--dh-color-border);
+  backdrop-filter: blur(10px);
+}
+
+.dh-shell-context {
+  width: min(100%, 70rem);
+  min-height: 3.5rem;
+  margin: 0 auto;
+  padding: 0 var(--dh-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dh-space-3);
+}
+
+.dh-shell-brand,
+.dh-rail-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dh-space-2);
+  color: var(--dh-color-text-primary);
+  font-size: 0.9375rem;
+  font-weight: var(--dh-font-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.dh-shell-brand-mark,
+.dh-rail-mark {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 1px solid var(--dh-color-border-strong);
+  border-radius: 0.375rem;
+  color: var(--dh-color-accent);
+  font-size: 0.75rem;
+  font-weight: var(--dh-font-weight-extrabold);
+  letter-spacing: -0.05em;
+}
+
+.dh-shell-page-context {
+  color: var(--dh-color-text-secondary);
+  font-size: var(--dh-font-size-metadata);
+  font-weight: var(--dh-font-weight-semibold);
+}
+
+.dh-shell-content {
+  width: 100%;
+  max-width: 70rem;
+  margin: 0 auto;
+  flex: 1;
+  padding: var(--dh-space-6) var(--dh-space-4) calc(5.5rem + env(safe-area-inset-bottom));
+}
+
+.dh-desktop-navigation {
+  display: none;
+}
+
+.dh-mobile-navigation {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--dh-color-surface);
+  border-top: 1px solid var(--dh-color-border);
+  padding: var(--dh-space-1) max(var(--dh-space-2), env(safe-area-inset-left)) calc(var(--dh-space-1) + env(safe-area-inset-bottom)) max(var(--dh-space-2), env(safe-area-inset-right));
+}
+
+.dh-mobile-navigation-items {
+  max-width: 38rem;
+  margin: 0 auto;
+  display: flex;
+}
+
+.dh-nav-button {
+  min-height: 3.5rem;
+  border-radius: var(--dh-radius-control);
+  color: var(--dh-color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dh-space-2);
+  font-weight: var(--dh-font-weight-semibold);
+  transition: color var(--dh-motion-standard) var(--dh-motion-ease), background-color var(--dh-motion-standard) var(--dh-motion-ease);
+}
+
+.dh-nav-button:hover {
+  color: var(--dh-color-text-primary);
+  background: var(--dh-color-surface-subtle);
+}
+
+.dh-nav-button:focus-visible {
+  outline: 3px solid var(--dh-color-focus);
+  outline-offset: -2px;
+}
+
+.dh-nav-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+}
+
+.dh-nav-button-active {
+  color: var(--dh-color-accent);
+}
+
+.dh-nav-button-mobile {
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1875rem;
+  padding: var(--dh-space-1);
+  font-size: 0.6875rem;
+}
+
+.dh-shell-focused .dh-shell-content {
+  max-width: 48rem;
+  padding-bottom: var(--dh-space-8);
+}
+
+/* Focused learning mode: the global shell chrome yields to the learner's
+   current recall decision. The feature owns its own compact context bar. */
+.dh-shell[data-focused-mode="srs"] .dh-shell-header {
+  display: none;
+}
+
+/* Phase 1 only maps common legacy utility colours into semantic surfaces.
+   Individual layouts and feature hierarchy migrate in later phases. */
+.dh-shell .bg-white { background-color: var(--dh-color-surface-elevated); }
+.dh-shell .bg-gray-50 { background-color: var(--dh-color-canvas); }
+.dh-shell .bg-gray-100 { background-color: var(--dh-color-surface-subtle); }
+.dh-shell .border-gray-100,
+.dh-shell .border-gray-200 { border-color: var(--dh-color-border); }
+.dh-shell .text-gray-800 { color: var(--dh-color-text-primary); }
+.dh-shell .text-gray-700,
+.dh-shell .text-gray-600 { color: var(--dh-color-text-secondary); }
+.dh-shell .text-gray-500,
+.dh-shell .text-gray-400 { color: var(--dh-color-text-muted); }
+
+:root[data-theme="dark"] .dh-shell .bg-blue-50,
+:root[data-theme="dark"] .dh-shell .bg-indigo-50,
+:root[data-theme="dark"] .dh-shell .bg-purple-50,
+:root[data-theme="dark"] .dh-shell .bg-amber-50,
+:root[data-theme="dark"] .dh-shell .bg-emerald-50,
+:root[data-theme="dark"] .dh-shell .bg-green-50,
+:root[data-theme="dark"] .dh-shell .bg-red-50,
+:root[data-theme="dark"] .dh-shell .bg-rose-50,
+:root[data-theme="dark"] .dh-shell .bg-orange-50,
+:root[data-theme="dark"] .dh-shell .bg-yellow-50 {
+  background-color: var(--dh-color-surface-subtle);
+}
+
+/* Existing feature screens still use Tailwind utility variants. Keep their
+   dark hover states on the semantic surface scale instead of allowing the
+   light-theme utility colors to flash back in. */
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-gray-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-gray-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-gray-200"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-white"]:hover {
+  background-color: var(--dh-color-surface-hover);
+}
+
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-blue-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-blue-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-indigo-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-indigo-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-purple-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-purple-100"]:hover {
+  background-color: var(--dh-color-accent-subtle);
+}
+
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-green-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-green-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-emerald-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-emerald-100"]:hover {
+  background-color: var(--dh-color-success-subtle);
+}
+
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-yellow-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-yellow-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-amber-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-amber-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-orange-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-orange-100"]:hover {
+  background-color: var(--dh-color-warning-subtle);
+}
+
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-red-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-red-100"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-rose-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-rose-100"]:hover {
+  background-color: var(--dh-color-error-subtle);
+}
+
+:root[data-theme="dark"] .dh-shell .bg-blue-100,
+:root[data-theme="dark"] .dh-shell .bg-indigo-100,
+:root[data-theme="dark"] .dh-shell .bg-purple-100 { background-color: var(--dh-color-accent-subtle); }
+:root[data-theme="dark"] .dh-shell .bg-green-100,
+:root[data-theme="dark"] .dh-shell .bg-emerald-100 { background-color: var(--dh-color-success-subtle); }
+:root[data-theme="dark"] .dh-shell .bg-yellow-100,
+:root[data-theme="dark"] .dh-shell .bg-amber-100,
+:root[data-theme="dark"] .dh-shell .bg-orange-100 { background-color: var(--dh-color-warning-subtle); }
+:root[data-theme="dark"] .dh-shell .bg-red-100,
+:root[data-theme="dark"] .dh-shell .bg-rose-100 { background-color: var(--dh-color-error-subtle); }
+:root[data-theme="dark"] .dh-shell [class~="bg-indigo-100/80"] { background-color: var(--dh-color-accent-subtle); }
+:root[data-theme="dark"] .dh-shell [class~="bg-red-50/30"] { background-color: var(--dh-color-error-subtle); }
+
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-r.from-indigo-50.to-blue-50,
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-br.from-blue-50.to-blue-100,
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-br.from-purple-50.to-purple-100,
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-br.from-green-50.to-green-100,
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-br.from-yellow-50.to-orange-100 {
+  background-image: none;
+  background-color: var(--dh-color-surface-subtle);
+}
+
+/* Support is an existing feature surface, not a separate light-theme island.
+   Keep its established warm treatment in light mode while giving dark mode a
+   readable semantic surface and action colour. */
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-r.from-amber-50.via-orange-50.to-rose-50 {
+  background-image: none;
+  background-color: var(--dh-color-surface-subtle);
+}
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-r.from-amber-400.to-orange-400,
+:root[data-theme="dark"] .dh-shell .bg-gradient-to-r.from-amber-400.to-orange-400:hover {
+  background-image: none;
+  background-color: var(--dh-color-warm-solid);
+}
+
+:root[data-theme="dark"] .dh-shell .bg-white { background-color: var(--dh-color-surface-elevated); }
+:root[data-theme="dark"] .dh-shell .bg-gray-50 { background-color: var(--dh-color-canvas); }
+:root[data-theme="dark"] .dh-shell .bg-gray-100 { background-color: var(--dh-color-surface-subtle); }
+:root[data-theme="dark"] .dh-shell .divide-gray-50 > :not([hidden]) ~ :not([hidden]) { border-color: var(--dh-color-border); }
+:root[data-theme="dark"] .dh-shell .border-gray-100,
+:root[data-theme="dark"] .dh-shell .border-gray-200,
+:root[data-theme="dark"] .dh-shell .border { border-color: var(--dh-color-border); }
+:root[data-theme="dark"] .dh-shell .text-gray-800 { color: var(--dh-color-text-primary); }
+:root[data-theme="dark"] .dh-shell .text-gray-700,
+:root[data-theme="dark"] .dh-shell .text-gray-600 { color: var(--dh-color-text-secondary); }
+:root[data-theme="dark"] .dh-shell .text-gray-500,
+:root[data-theme="dark"] .dh-shell .text-gray-400,
+:root[data-theme="dark"] .dh-shell .text-gray-300 { color: var(--dh-color-text-muted); }
+:root[data-theme="dark"] .dh-shell .text-blue-700,
+:root[data-theme="dark"] .dh-shell .text-blue-600,
+:root[data-theme="dark"] .dh-shell .text-blue-500,
+:root[data-theme="dark"] .dh-shell .text-blue-400,
+:root[data-theme="dark"] .dh-shell .text-indigo-700,
+:root[data-theme="dark"] .dh-shell .text-indigo-600,
+:root[data-theme="dark"] .dh-shell .text-indigo-500,
+:root[data-theme="dark"] .dh-shell .text-purple-700,
+:root[data-theme="dark"] .dh-shell .text-purple-600,
+:root[data-theme="dark"] .dh-shell .text-purple-500,
+:root[data-theme="dark"] .dh-shell [class~="text-blue-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-blue-900"],
+:root[data-theme="dark"] .dh-shell [class~="text-indigo-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-purple-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-purple-900"] { color: var(--dh-color-accent); }
+:root[data-theme="dark"] .dh-shell .text-green-700,
+:root[data-theme="dark"] .dh-shell .text-green-600,
+:root[data-theme="dark"] .dh-shell .text-emerald-700,
+:root[data-theme="dark"] .dh-shell .text-green-500,
+:root[data-theme="dark"] .dh-shell .text-emerald-600,
+:root[data-theme="dark"] .dh-shell [class~="text-green-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-green-900"],
+:root[data-theme="dark"] .dh-shell [class~="text-emerald-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-emerald-900"] { color: var(--dh-color-success); }
+:root[data-theme="dark"] .dh-shell .text-yellow-700,
+:root[data-theme="dark"] .dh-shell .text-yellow-600,
+:root[data-theme="dark"] .dh-shell .text-amber-700,
+:root[data-theme="dark"] .dh-shell .text-amber-600,
+:root[data-theme="dark"] .dh-shell .text-yellow-500,
+:root[data-theme="dark"] .dh-shell [class~="text-yellow-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-amber-800"] { color: var(--dh-color-warning); }
+:root[data-theme="dark"] .dh-shell .text-red-700,
+:root[data-theme="dark"] .dh-shell .text-red-600,
+:root[data-theme="dark"] .dh-shell .text-rose-700,
+:root[data-theme="dark"] .dh-shell .text-red-500,
+:root[data-theme="dark"] .dh-shell .text-red-400,
+:root[data-theme="dark"] .dh-shell .text-rose-600,
+:root[data-theme="dark"] .dh-shell .text-rose-500,
+:root[data-theme="dark"] .dh-shell [class~="text-red-800"],
+:root[data-theme="dark"] .dh-shell [class~="text-red-900"] { color: var(--dh-color-error); }
+:root[data-theme="dark"] .dh-shell [class~="hover:text-gray-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-gray-600"]:hover { color: var(--dh-color-text-primary); }
+:root[data-theme="dark"] .dh-shell [class~="hover:text-blue-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-blue-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-indigo-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-indigo-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-purple-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-purple-600"]:hover { color: var(--dh-color-accent-hover); }
+:root[data-theme="dark"] .dh-shell [class~="hover:text-green-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-green-600"]:hover { color: var(--dh-color-success); }
+:root[data-theme="dark"] .dh-shell [class~="hover:text-red-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:text-red-600"]:hover { color: var(--dh-color-error); }
+:root[data-theme="dark"] .dh-shell [class~="hover:border-blue-300"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:border-indigo-300"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:border-purple-300"]:hover { border-color: var(--dh-color-accent); }
+:root[data-theme="dark"] .dh-shell [class~="hover:border-red-50"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:border-red-300"]:hover { border-color: var(--dh-color-error); }
+:root[data-theme="dark"] .dh-shell [class~="border-blue-100"],
+:root[data-theme="dark"] .dh-shell [class~="border-blue-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-blue-300"],
+:root[data-theme="dark"] .dh-shell [class~="border-blue-400"],
+:root[data-theme="dark"] .dh-shell [class~="border-indigo-100"],
+:root[data-theme="dark"] .dh-shell [class~="border-indigo-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-indigo-300"],
+:root[data-theme="dark"] .dh-shell [class~="border-purple-100"],
+:root[data-theme="dark"] .dh-shell [class~="border-purple-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-purple-300"] { border-color: var(--dh-color-border); }
+:root[data-theme="dark"] .dh-shell [class~="border-green-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-green-300"],
+:root[data-theme="dark"] .dh-shell [class~="border-emerald-100"],
+:root[data-theme="dark"] .dh-shell [class~="border-emerald-200"] { border-color: var(--dh-color-success); }
+:root[data-theme="dark"] .dh-shell [class~="border-yellow-300"],
+:root[data-theme="dark"] .dh-shell [class~="border-amber-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-orange-200"] { border-color: var(--dh-color-warning); }
+:root[data-theme="dark"] .dh-shell [class~="border-red-100"],
+:root[data-theme="dark"] .dh-shell [class~="border-red-200"],
+:root[data-theme="dark"] .dh-shell [class~="border-red-300"],
+:root[data-theme="dark"] .dh-shell [class~="border-red-400"],
+:root[data-theme="dark"] .dh-shell [class~="border-rose-200"] { border-color: var(--dh-color-error); }
+
+/* Dark-mode action colors retain their semantic hue while meeting readable
+   contrast with the existing white action labels. */
+:root[data-theme="dark"] .dh-shell [class~="bg-blue-600"],
+:root[data-theme="dark"] .dh-shell [class~="bg-blue-500"],
+:root[data-theme="dark"] .dh-shell [class~="bg-indigo-500"],
+:root[data-theme="dark"] .dh-shell [class~="bg-indigo-600"] { background-color: var(--dh-color-accent-solid); }
+:root[data-theme="dark"] .dh-shell [class~="bg-purple-500"],
+:root[data-theme="dark"] .dh-shell [class~="bg-purple-600"] { background-color: var(--dh-color-accent-alt-solid); }
+:root[data-theme="dark"] .dh-shell [class~="bg-green-500"],
+:root[data-theme="dark"] .dh-shell [class~="bg-green-600"],
+:root[data-theme="dark"] .dh-shell [class~="bg-emerald-600"] { background-color: var(--dh-color-success-solid); }
+:root[data-theme="dark"] .dh-shell [class~="bg-orange-400"],
+:root[data-theme="dark"] .dh-shell [class~="bg-orange-500"] { background-color: var(--dh-color-warm-solid); }
+:root[data-theme="dark"] .dh-shell [class~="bg-red-500"],
+:root[data-theme="dark"] .dh-shell [class~="bg-red-600"],
+:root[data-theme="dark"] .dh-shell [class~="bg-rose-500"] { background-color: var(--dh-color-error-solid); }
+:root[data-theme="dark"] .dh-shell [class~="bg-yellow-400"] { background-color: var(--dh-color-warning-solid); }
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-blue-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-blue-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-indigo-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-indigo-700"]:hover { background-color: var(--dh-color-accent-solid); }
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-purple-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-purple-700"]:hover { background-color: var(--dh-color-accent-alt-solid); }
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-green-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-green-700"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-emerald-700"]:hover { background-color: #14532d; }
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-orange-500"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-orange-600"]:hover { background-color: var(--dh-color-warm-solid); }
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-red-600"]:hover,
+:root[data-theme="dark"] .dh-shell [class~="hover:bg-red-700"]:hover { background-color: var(--dh-color-error-strong-solid); }
+:root[data-theme="dark"] .dh-shell input,
+:root[data-theme="dark"] .dh-shell textarea,
+:root[data-theme="dark"] .dh-shell select { color: var(--dh-color-text-primary); }
+
+/* ─────────────────────────────────────────────
+   Study mode
+   ───────────────────────────────────────────── */
+.dh-study {
+  width: 100%;
+  max-width: 54rem;
+  min-height: min(48rem, calc(100svh - 3rem));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dh-space-5);
+  color: var(--dh-color-text-primary);
+}
+
+.dh-study-header {
+  display: flex;
+  align-items: center;
+  gap: var(--dh-space-3);
+  min-height: 2.75rem;
+}
+
+.dh-study-back,
+.dh-study-secondary-action,
+.dh-study-note-button,
+.dh-study-note-save {
+  color: var(--dh-color-text-secondary);
+  font-size: var(--dh-font-size-metadata);
+  font-weight: var(--dh-font-weight-semibold);
+}
+
+.dh-study-back {
+  min-height: 2.75rem;
+  padding: 0 var(--dh-space-2);
+  border-radius: var(--dh-radius-control);
+  white-space: nowrap;
+}
+
+.dh-study-back:hover,
+.dh-study-secondary-action:hover,
+.dh-study-note-button:hover,
+.dh-study-note-save:hover {
+  color: var(--dh-color-text-primary);
+}
+
+.dh-study-header-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.dh-study-header-copy h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--dh-font-size-heading);
+  line-height: var(--dh-line-height-tight);
+  font-weight: var(--dh-font-weight-bold);
+}
+
+.dh-study-header-copy p,
+.dh-study-progress-row,
+.dh-study-state p,
+.dh-study-results p {
+  color: var(--dh-color-text-muted);
+  font-size: var(--dh-font-size-metadata);
+}
+
+.dh-study-xp {
+  color: var(--dh-color-success);
+  font-size: var(--dh-font-size-metadata);
+  font-weight: var(--dh-font-weight-bold);
+  white-space: nowrap;
+}
+
+.dh-study-progress-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: calc(var(--dh-space-2) * -1);
+}
+
+.dh-study-progress {
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dh-color-border);
+}
+
+.dh-study-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dh-color-accent);
+  transition: width var(--dh-motion-standard) var(--dh-motion-ease);
+}
+
+.dh-study-stage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: var(--dh-space-3) 0 var(--dh-space-6);
+}
+
+.dh-study-card-flow {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dh-space-5);
+}
+
+.dh-study-card-wrap {
+  width: min(100%, 39rem);
+}
+
+.dh-study-card {
+  position: relative;
+  min-height: clamp(19rem, 48svh, 28rem);
+  transform-style: preserve-3d;
+  transition: transform 420ms var(--dh-motion-ease);
+}
+
+.dh-study-card-flip-action {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dh-study-card-flip-action:focus-visible {
+  outline: 3px solid var(--dh-color-focus);
+  outline-offset: 5px;
+  border-radius: var(--dh-radius-surface);
+}
+
+.dh-study-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(var(--dh-space-5), 5vw, var(--dh-space-8));
+  border: 1px solid var(--dh-color-border);
+  border-radius: var(--dh-radius-surface);
+  background: var(--dh-color-surface);
+  box-shadow: var(--dh-elevation-low);
+  text-align: center;
+}
+
+.dh-study-card-face > * {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.dh-study-card-face > .dh-study-card-flip-action {
+  pointer-events: auto;
+}
+
+.dh-study-card-face .dh-study-word-row > .inline-flex,
+.dh-study-card-face .dh-study-context-audio {
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.dh-study-card-front {
+  visibility: visible;
+}
+
+.dh-study-card-revealed .dh-study-card-front {
+  visibility: hidden;
+}
+
+.dh-study-card-revealed .dh-study-card-back {
+  visibility: visible;
+  transform: rotateY(180deg);
+}
+
+.dh-study-card-back {
+  background: var(--dh-color-surface-elevated);
+}
+
+.dh-study-eyebrow,
+.dh-study-state-kicker,
+.dh-study-rating legend,
+.dh-study-results > p {
+  color: var(--dh-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--dh-font-weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dh-study-prompt,
+.dh-study-word {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--dh-color-text-primary);
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: var(--dh-font-weight-bold);
+  line-height: 1.15;
+}
+
+.dh-study-prompt {
+  margin-top: var(--dh-space-4);
+}
+
+.dh-study-reveal-hint {
+  margin-top: auto;
+  color: var(--dh-color-text-muted);
+  font-size: var(--dh-font-size-metadata);
+}
+
+.dh-study-note,
+.dh-study-due {
+  color: var(--dh-color-text-secondary);
+  font-size: var(--dh-font-size-metadata);
+}
+
+.dh-study-note {
+  max-width: 30rem;
+  margin-top: var(--dh-space-4);
+}
+
+.dh-study-due {
+  position: absolute;
+  right: var(--dh-space-5);
+  bottom: var(--dh-space-4);
+}
+
+.dh-study-word-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--dh-space-3);
+  margin-top: var(--dh-space-4);
+}
+
+.dh-study-word {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.dh-study-gender {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 var(--dh-space-2);
+  border-radius: var(--dh-radius-control);
+  font-size: var(--dh-font-size-metadata);
+  font-weight: var(--dh-font-weight-bold);
+}
+
+.dh-study-gender-der { color: var(--dh-color-gender-der); background: color-mix(in srgb, var(--dh-color-gender-der) 12%, var(--dh-color-surface)); }
+.dh-study-gender-die { color: var(--dh-color-gender-die); background: color-mix(in srgb, var(--dh-color-gender-die) 12%, var(--dh-color-surface)); }
+.dh-study-gender-das { color: var(--dh-color-gender-das); background: color-mix(in srgb, var(--dh-color-gender-das) 12%, var(--dh-color-surface)); }
+.dh-study-gender-verb { color: var(--dh-color-gender-verb); background: color-mix(in srgb, var(--dh-color-gender-verb) 12%, var(--dh-color-surface)); }
+.dh-study-gender-unknown { color: var(--dh-color-text-secondary); background: var(--dh-color-canvas); }
+
+.dh-study-plural {
+  margin-top: var(--dh-space-2);
+  color: var(--dh-color-text-secondary);
+  font-size: var(--dh-font-size-body);
+}
+
+.dh-study-context {
+  width: 100%;
+  max-width: 34rem;
+  margin-top: var(--dh-space-5);
+  padding: var(--dh-space-4);
+  border-top: 1px solid var(--dh-color-border);
+}
+
+.dh-study-example {
+  color: var(--dh-color-text-primary);
+  font-size: var(--dh-font-size-body);
+  line-height: var(--dh-line-height-relaxed);
+}
+
+.dh-study-context-audio {
+  margin-top: var(--dh-space-2);
+}
+
+.dh-study-translation {
+  margin-top: var(--dh-space-2);
+  color: var(--dh-color-text-secondary);
+  font-size: var(--dh-font-size-metadata);
+  font-style: italic;
+}
+
+.dh-study-rating {
+  width: min(100%, 39rem);
+  border: 0;
+  padding: 0;
+}
+
+.dh-study-rating legend {
+  width: 100%;
+  margin-bottom: var(--dh-space-3);
+  text-align: center;
+}
+
+.dh-study-rating-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dh-space-2);
+}
+
+.dh-study-rating-button {
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--dh-radius-control);
+  color: #fff;
+  font-size: var(--dh-font-size-metadata);
+  font-weight: var(--dh-font-weight-bold);
+  transition: background-color var(--dh-motion-standard) var(--dh-motion-ease), border-color var(--dh-motion-standard) var(--dh-motion-ease), transform var(--dh-motion-standard) var(--dh-motion-ease);
+}
+
+.dh-study-rating-button:hover { transform: translateY(-1px); }
+.dh-study-rating-again { background: var(--dh-color-review-again); }
+.dh-study-rating-hard { background: var(--dh-color-review-hard); }
+.dh-study-rating-good { background: var(--dh-color-review-good); }
+.dh-study-rating-easy { background: var(--dh-color-review-easy); }
+
+.dh-study-note-control {
+  width: min(100%, 39rem);
+  min-height: 2rem;
+  text-align: center;
+}
+
+.dh-study-note-editor {
+  display: flex;
+  gap: var(--dh-space-2);
+}
+
+.dh-study-note-input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--dh-color-warning);
+  border-radius: var(--dh-radius-control);
+  background: var(--dh-color-surface);
+  color: var(--dh-color-text-primary);
+  padding: var(--dh-space-2) var(--dh-space-3);
+  font-size: var(--dh-font-size-metadata);
+}
+
+.dh-study-note-save {
+  padding: 0 var(--dh-space-3);
+  border-radius: var(--dh-radius-control);
+  background: var(--dh-color-warning);
+  color: #fff;
+}
+
+.dh-study-state {
+  width: min(100%, 36rem);
+  margin: auto;
+  padding: var(--dh-space-8) var(--dh-space-5);
+  border-top: 1px solid var(--dh-color-border);
+  border-bottom: 1px solid var(--dh-color-border);
+  text-align: center;
+}
+
+.dh-study-state h3 {
+  margin-top: var(--dh-space-2);
+  color: var(--dh-color-text-primary);
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: var(--dh-line-height-tight);
+}
+
+.dh-study-state p:last-child {
+  margin-top: var(--dh-space-2);
+}
+
+.dh-study-complete strong { color: var(--dh-color-success); }
+
+.dh-study-secondary-action {
+  align-self: center;
+  min-height: 2.75rem;
+  padding: 0 var(--dh-space-4);
+  border: 1px solid var(--dh-color-border);
+  border-radius: var(--dh-radius-control);
+}
+
+.dh-study-results {
+  width: min(100%, 39rem);
+  margin: 0 auto;
+}
+
+.dh-study-results > p { margin-bottom: var(--dh-space-3); }
+
+.dh-study-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dh-space-2);
+}
+
+.dh-study-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dh-space-1);
+  padding: var(--dh-space-3) var(--dh-space-2);
+  border-top: 2px solid currentColor;
+  color: var(--dh-color-text-secondary);
+}
+
+.dh-study-result strong { color: var(--dh-color-text-primary); font-size: 1.25rem; }
+.dh-study-result span { font-size: var(--dh-font-size-metadata); font-weight: var(--dh-font-weight-semibold); }
+.dh-study-result-again { color: var(--dh-color-review-again); }
+.dh-study-result-hard { color: var(--dh-color-review-hard); }
+.dh-study-result-good { color: var(--dh-color-review-good); }
+.dh-study-result-easy { color: var(--dh-color-review-easy); }
+
+@media (max-width: 480px) {
+  .dh-study { gap: var(--dh-space-4); }
+  .dh-study-stage { padding-top: 0; }
+  .dh-study-card { min-height: min(25rem, 55svh); }
+  .dh-study-card-face { padding: var(--dh-space-5) var(--dh-space-4); }
+  .dh-study-rating-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 768px) {
+  .dh-study { min-height: min(50rem, calc(100svh - 5rem)); }
+  .dh-study-stage { padding-top: var(--dh-space-5); }
+}
+
+@media (min-width: 1024px) {
+  .dh-desktop-navigation {
+    display: flex;
+    flex: 0 0 11.5rem;
+    width: 11.5rem;
+    flex-direction: column;
+    background: var(--dh-color-surface);
+    border-right: 1px solid var(--dh-color-border);
+    padding: var(--dh-space-5) var(--dh-space-3);
+  }
+
+  .dh-mobile-navigation {
+    display: none;
+  }
+
+  .dh-rail-brand {
+    min-height: 2.75rem;
+    padding: 0 var(--dh-space-3);
+  }
+
+  .dh-rail-brand > span:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .dh-rail-brand small {
+    color: var(--dh-color-text-muted);
+    font-size: 0.6875rem;
+    font-weight: var(--dh-font-weight-regular);
+    letter-spacing: 0;
+  }
+
+  .dh-desktop-navigation-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dh-space-1);
+    margin-top: var(--dh-space-10);
+  }
+
+  .dh-shell-content {
+    padding: var(--dh-space-10) var(--dh-space-12) var(--dh-space-12);
+  }
+
+  .dh-nav-button-desktop {
+    width: 100%;
+    justify-content: flex-start;
+    padding: var(--dh-space-3) var(--dh-space-3);
+    font-size: 0.875rem;
+  }
+
+  .dh-shell-brand {
+    display: none;
+  }
+
+  .dh-shell-page-context {
+    color: var(--dh-color-text-primary);
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dh-shell-content {
+    max-width: 72rem;
+    padding-inline: var(--dh-space-16);
+  }
+}

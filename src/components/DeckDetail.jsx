@@ -3,8 +3,9 @@ import { SpeakBtn, GBadge } from "./SharedUI";
 import { LEVELS } from "../config/constants";
 import CardItem from "./CardItem";
 import AITutorModal from "./AITutorModal";
+import { getAIUserMessage } from "../ai/errors";
 
-export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,setUser, deps}) {
+export default function DeckDetail({deck,setLibrary,onBack,onFocusedModeChange,addXP,addStreak,user,setUser, deps}) {
   const { uid, today, isWeak, isDue, DB, generateAIFlashcards, generateAITutorResponse, CardModal, SRSSession, QuizMode, WritingPractice, ListeningQuiz, publishPublicDeck } = deps;
   const [editCard,setEditCard]=useState(null);
   const [search,setSearch]=useState("");
@@ -20,6 +21,15 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
   const [aiTutorOpen,setAiTutorOpen]=useState(false);
   const [publishState,setPublishState]=useState("idle"); // idle | loading | done | error
   const [publishMsg,setPublishMsg]=useState("");
+
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    onFocusedModeChange?.(nextMode || false);
+  };
+  const exitMode = () => {
+    setMode(null);
+    onFocusedModeChange?.(false);
+  };
 
   const runAIAdd = async () => {
     if(!aiPrompt.trim()) return;
@@ -42,7 +52,7 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
           setUser(nextUser); await DB.setUser(user.uid, { lastGenDate: td, dailyGens: used + 1 });
         }
       } else { setAiErr("No cards generated."); }
-    } catch(e) { setAiErr(e.message); }
+    } catch(e) { setAiErr(getAIUserMessage(e)); }
     setAiLoading(false);
   };
 
@@ -90,17 +100,17 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
   const masteredCount=deck.cards.filter(c=>c.interval>=21).length;
   const weakCount=deck.cards.filter(isWeak).length;
 
-  if(mode==="srs")return <SRSSession deck={deck} onBack={()=>setMode(null)} onUpdateDeck={updateDeck} addXP={addXP} addStreak={addStreak}/>;
-  if(mode==="quiz")return <QuizMode deck={deck} onBack={()=>setMode(null)} addXP={addXP}/>;
-  if(mode==="writing")return <WritingPractice deck={deck} onBack={()=>setMode(null)} addXP={addXP}/>;
-  if(mode==="listening")return <ListeningQuiz deck={deck} onBack={()=>setMode(null)} addXP={addXP}/>;
+  if(mode==="srs")return <SRSSession deck={deck} onBack={exitMode} onUpdateDeck={updateDeck} addXP={addXP} addStreak={addStreak}/>;
+  if(mode==="quiz")return <QuizMode deck={deck} onBack={exitMode} addXP={addXP}/>;
+  if(mode==="writing")return <WritingPractice deck={deck} onBack={exitMode} addXP={addXP}/>;
+  if(mode==="listening")return <ListeningQuiz deck={deck} onBack={exitMode} addXP={addXP}/>;
 
   return(
     <div className="flex flex-col gap-4">
 
       {/* ── Header ── */}
       <div className="flex items-start gap-2">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl mt-0.5">←</button>
+        <button type="button" aria-label="Back to library" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl mt-0.5">←</button>
 
         {/* Title + meta */}
         <div className="flex-1 min-w-0">
@@ -108,7 +118,7 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
             ? <input autoFocus className="border border-blue-300 rounded-lg px-2 py-1 text-sm w-full focus:outline-none font-bold" value={newName} onChange={e=>setNewName(e.target.value)} onBlur={rename} onKeyDown={e=>e.key==="Enter"&&rename()}/>
             : <div className="flex items-center gap-2">
                 <p className="font-extrabold text-gray-800 text-base truncate">{deck.name}</p>
-                <button onClick={()=>{setEditName(true);setNewName(deck.name);}} className="text-gray-400 text-xs shrink-0">✏️</button>
+                <button type="button" aria-label={`Edit deck name: ${deck.name}`} onClick={()=>{setEditName(true);setNewName(deck.name);}} className="text-gray-400 text-xs shrink-0">✏️</button>
               </div>
           }
           <div className="flex items-center gap-2 mt-0.5">
@@ -167,18 +177,18 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={()=>setMode("srs")} disabled={dueCount===0} className="bg-green-500 hover:bg-green-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs transition-colors flex flex-col items-center gap-0.5"><span className="text-lg">🃏</span>Study ({dueCount})</button>
-        <button onClick={()=>setMode("quiz")} disabled={deck.cards.length<4} className="bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span className="text-lg">🎯</span>Quiz</button>
-        <button onClick={()=>setMode("writing")} disabled={deck.cards.length===0} className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span className="text-lg">✍️</span>Writing</button>
-        <button onClick={()=>setMode("listening")} disabled={deck.cards.length<4} className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span className="text-lg">🎧</span>Listening</button>
+        <button type="button" onClick={()=>changeMode("srs")} disabled={dueCount===0} className="bg-green-500 hover:bg-green-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs transition-colors flex flex-col items-center gap-0.5"><span aria-hidden="true" className="text-lg">🃏</span>Study ({dueCount})</button>
+        <button type="button" onClick={()=>changeMode("quiz")} disabled={deck.cards.length<4} className="bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span aria-hidden="true" className="text-lg">🎯</span>Quiz</button>
+        <button type="button" onClick={()=>changeMode("writing")} disabled={deck.cards.length===0} className="bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span aria-hidden="true" className="text-lg">✍️</span>Writing</button>
+        <button type="button" onClick={()=>changeMode("listening")} disabled={deck.cards.length<4} className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-xs flex flex-col items-center gap-0.5"><span aria-hidden="true" className="text-lg">🎧</span>Listening</button>
       </div>
 
       {/* ── Card controls: Search + AI Tutor + Add ── */}
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="Search cards…" value={search} onChange={e=>setSearch(e.target.value)}/>
-          <button onClick={()=>setAiTutorOpen(true)} className="flex items-center gap-1.5 bg-indigo-100/80 text-indigo-700 font-bold px-4 py-2 rounded-xl text-sm hover:bg-indigo-200 transition-colors shadow-sm" title="AI Tutor">
-            <span className="text-lg">🤖</span>
+          <button type="button" onClick={()=>setAiTutorOpen(true)} aria-label="Open AI Tutor" className="flex items-center gap-1.5 bg-indigo-100/80 text-indigo-700 font-bold px-4 py-2 rounded-xl text-sm hover:bg-indigo-200 transition-colors shadow-sm" title="AI Tutor">
+            <span aria-hidden="true" className="text-lg">🤖</span>
             <span>Tutor</span>
           </button>
         </div>
@@ -205,7 +215,7 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
             <button onClick={runAIAdd} disabled={aiLoading} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50 transition-colors shadow-sm">{aiLoading ? "..." : "Generate & Add"}</button>
             <button onClick={()=>setAiMode(false)} className="px-3 py-2 rounded-xl text-sm font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm">Cancel</button>
           </div>
-          {aiErr&&<p className="text-xs text-red-500 font-bold text-center mt-1">{aiErr}</p>}
+          {aiErr&&<p role="alert" className="text-xs text-red-500 font-bold text-center mt-1">{aiErr}</p>}
         </div>
       )}
 
@@ -220,8 +230,8 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
               {isWeak(card)&&<span className="text-[10px] bg-red-100 text-red-500 font-bold px-1.5 py-0.5 rounded-lg border border-red-200 shrink-0" title={"Confidence: " + (card.confidenceScore ?? 70) + "%"}>⚠️ Weak</span>}
               {card.note&&<span className="text-xs text-amber-400 shrink-0" title={card.note}>📝</span>}
               <SpeakBtn text={card.back} small/>
-              <button onClick={()=>setEditCard({card})} className="text-blue-400 hover:text-blue-600 text-xs px-1">✏️</button>
-              <button onClick={()=>delCard(card.id)} className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
+              <button type="button" aria-label={`Edit ${card.back}`} onClick={()=>setEditCard({card})} className="text-blue-400 hover:text-blue-600 text-xs px-1">✏️</button>
+              <button type="button" aria-label={`Delete ${card.back}`} onClick={()=>delCard(card.id)} className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
             </div>
           ))}
         </div>}
@@ -231,4 +241,3 @@ export default function DeckDetail({deck,setLibrary,onBack,addXP,addStreak,user,
     </div>
   );
 }
-

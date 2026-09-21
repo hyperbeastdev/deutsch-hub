@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { getAIUserMessage } from "../ai/errors";
+import useDialogA11y from "../hooks/useDialogA11y";
 
 export default function AITutorModal({ deck, onClose, generateAITutorResponse }) {
   const [mode, setMode] = useState(null); // 'explain' | 'sentences' | 'correct'
@@ -8,6 +10,7 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
   const [correctionResult, setCorrectionResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { dialogRef } = useDialogA11y({ onClose });
 
   const level = deck?.level || "A1";
   const word = selectedCard?.back || "";
@@ -30,24 +33,26 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
       } else {
         setResponse(res);
       }
-    } catch(e) { setError(e.message); }
+    } catch(e) { setError(getAIUserMessage(e)); }
     setLoading(false);
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ai-tutor-dialog-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div>
-            <h3 className="font-extrabold text-gray-800">🤖 AI Tutor</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Powered by LLaMA 3.1</p>
+            <h3 id="ai-tutor-dialog-title" className="font-extrabold text-gray-800">🤖 AI Tutor</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Powered by Groq</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+          <button type="button" aria-label="Close AI Tutor dialog" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
         </div>
 
         <div className="p-4 border-b border-gray-100">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Select Word</p>
           <select
+            data-dialog-initial-focus="true"
+            aria-label="Tutor word"
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
             value={selectedCard?.id || ""}
             onChange={e => setSelectedCard(deck.cards.find(c=>c.id===e.target.value) || null)}
@@ -66,6 +71,8 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
               {key:"correct", icon:"✅", label:"Correct Me"},
             ].map(btn => (
               <button key={btn.key} onClick={() => run(btn.key)}
+                type="button"
+                aria-label={btn.label}
                 disabled={loading}
                 className={"flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-xs font-bold transition-all disabled:opacity-40 " + (mode===btn.key ? "border-purple-500 bg-purple-50 text-purple-700" : "border-gray-200 bg-white text-gray-600 hover:border-purple-300")}>
                 <span className="text-lg">{btn.icon}</span>{btn.label}
@@ -76,13 +83,14 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
           {mode === "correct" && (
             <div className="flex gap-2">
               <input
+                aria-label="German sentence to correct"
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
                 placeholder="Write a German sentence to check…"
                 value={userInput}
                 onChange={e => setUserInput(e.target.value)}
                 onKeyDown={e => e.key==="Enter" && run("correct")}
               />
-              <button onClick={() => run("correct")} disabled={loading || !userInput.trim()}
+              <button type="button" onClick={() => run("correct")} disabled={loading || !userInput.trim()}
                 className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-40 hover:bg-purple-700 transition-colors">
                 Check
               </button>
@@ -90,14 +98,14 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
           )}
 
           {loading && (
-            <div className="flex items-center justify-center py-8 gap-2">
+            <div role="status" aria-live="polite" className="flex items-center justify-center py-8 gap-2">
               <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:"0ms"}}/>
               <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:"150ms"}}/>
               <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:"300ms"}}/>
             </div>
           )}
 
-          {error && <p className="text-xs text-red-500 font-bold text-center">{error}</p>}
+          {error && <p role="alert" className="text-xs text-red-500 font-bold text-center">{error}</p>}
 
           {response && !loading && mode !== "correct" && (
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mt-2">

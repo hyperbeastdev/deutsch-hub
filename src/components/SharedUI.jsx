@@ -127,7 +127,9 @@ export function SpeakBtn({ text, small }) {
 
   const Btn = ({ speed, icon, label }) => (
     <button
+      type="button"
       onClick={e => play(e, speed)}
+      aria-label={`${speed === "slow" ? "Play slow" : "Play normal"} pronunciation for ${text}`}
       className={
         "inline-flex items-center gap-0.5 rounded-lg border font-semibold transition-all " +
         (active === speed
