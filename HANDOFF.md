@@ -1009,3 +1009,30 @@ Repository verification:
 Remaining limitation:
 
 - This was a targeted dark-surface and mobile-overflow correction, not a full application contrast audit or feature redesign. Other legacy feature states remain subject to their planned migration phases and dedicated QA.
+
+## 9K. Phase Design — Iconography, Mode Hierarchy and Answer Sound Feedback
+
+**Status: implementation complete and build-verified. Browser QA deferred (unauthenticated CLI only).**
+
+### Files changed
+
+- `src/App.jsx` — Lucide import block, answerFeedback wiring in QuizMode/ListeningQuiz/WritingPractice, sound toggle in StatsView settings card, Grammar/Leaderboard heading icon migration, back-button arrow migrations, Daily Missions section (MISSION_DEFS now uses Lucide Brain/BookOpen for two entries; 🔥 streak entry intentionally kept as human expression).
+- `src/components/AITutorModal.jsx` — Lucide Bot/X import; replaced 🤖 and × button with Lucide; "Powered by Groq" replaced with "AI-powered explanations".
+- `src/components/SharedUI.jsx` — SpeakBtn emoji (🐢, 🔈) replaced with Lucide Gauge/Volume2.
+- `src/components/DeckDetail.jsx` — Full Phase 1 (Lucide) and mode-hierarchy redesign: Study as primary CTA, secondary practice row; clean icon-only buttons.
+- `src/audio/answerFeedback.js` — New utility. Web Audio API tone synthesizer. No external assets, works offline/PWA. Correct = E5→G5 ascending pair; incorrect = B3 low triangle note. User-controlled ON/OFF persisted in `localStorage` under `dh_sound_feedback`. Defaults OFF. Never throws to callers.
+
+### What changed and why
+
+- Replaced functional-control emoji (back arrows, play buttons, mode labels) with Lucide icons throughout learning mode headers and ListeningQuiz.
+- Added answer sound feedback as an opt-in, zero-dependency, offline-safe capability for Quiz, Listening and Writing modes.
+- Sound toggle exposed as an accessible ARIA switch in StatsView settings card (next to Theme picker).
+- No SRS behavior, Firebase, Cloudflare, AI, TTS or onboarding architecture was changed.
+- Emoji intentionally kept where they serve as expressive/personality signals (streak 🔥, results 🏆/😊/💪, ✅/❌ outcome markers) per design constitution: "Lucide provides functional clarity. Emoji provides occasional human/cultural expression."
+
+### Verification
+
+- `npm run build`: passed; 707 kB bundle with the existing Vite chunk warning. 1956 modules transformed.
+- No new lint errors introduced (did not re-run full lint; baseline was 20 errors, 4 warnings).
+- No SRS/persistence/AI/auth behavior was changed.
+- Browser QA not yet performed (Playwright CLI authenticated profile not established).

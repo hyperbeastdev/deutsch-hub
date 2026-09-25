@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Gauge, Volume2 } from "lucide-react";
 import { GS } from "../config/constants";
 
 // Re-arm synthesis when tab regains focus (Chrome suspends it on blur)
@@ -125,7 +126,10 @@ export function SpeakBtn({ text, small }) {
     }
   };
 
-  const Btn = ({ speed, icon, label }) => (
+  const Btn = ({ speed, label }) => {
+    const Icon = speed === "slow" ? Gauge : Volume2;
+    const sz = small ? 12 : 14;
+    return (
     <button
       type="button"
       onClick={e => play(e, speed)}
@@ -138,14 +142,15 @@ export function SpeakBtn({ text, small }) {
         " " + (small ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs")
       }
     >
-      {icon}{label}
+      <Icon size={sz} strokeWidth={2} aria-hidden="true" />{label}
     </button>
   );
+  };
 
   return (
     <span className="inline-flex gap-1" onClick={e => e.stopPropagation()}>
-      <Btn speed="slow"   icon="🐢" label="Slow"   />
-      <Btn speed="normal" icon="🔈" label="Normal" />
+      <Btn speed="slow"   label="Slow"   />
+      <Btn speed="normal" label="Normal" />
     </span>
   );
 }

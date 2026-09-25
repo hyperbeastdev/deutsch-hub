@@ -8,6 +8,7 @@ import { SpeakBtn, GBadge } from "./components/SharedUI";
 import DeckDetail from "./components/DeckDetail";
 import AITutorModal from "./components/AITutorModal";
 import ExploreTab from "./components/ExploreTab";
+import ProfileTab from "./components/ProfileTab";
 import { SUPPORT_URL } from "./config/supportLinks";
 import { authService } from "./auth/authService";
 import { PROFILE_STATES, readUserProfile } from "./auth/profileRepository";
@@ -19,6 +20,13 @@ import {
   getStoredThemePreference,
   saveThemePreference,
 } from "./theme/theme";
+import {
+  ArrowLeft, Pencil, Trash2, Download, Library as LibraryIcon,
+  Bell, Target, Brain, BookOpen, Trophy,
+  Plus, RotateCcw, Volume2, Headphones, Gauge,
+  X, Check, ClipboardList, Save, ChevronDown, ChevronUp, Bot,
+} from "lucide-react";
+import answerFeedback from "./audio/answerFeedback";
 
 export { generateAIFlashcards };
 
@@ -471,7 +479,7 @@ function StreakCalendar({history}) {
     <div className="flex gap-1 justify-center">
       {days.map((d,i)=>(
         <div key={i} className="flex flex-col items-center gap-1">
-          <div className={"w-8 h-8 rounded-xl flex items-center justify-center text-base " + (d.done?"bg-orange-400 text-white":"bg-gray-100 text-gray-300")}>{d.done?"🔥":"-"}</div>
+          <div className={"w-8 h-8 rounded-xl flex items-center justify-center text-base " + (d.done?"bg-orange-400 text-white":"bg-gray-100 text-gray-300")}>{d.done?<span aria-hidden="true">🔥</span>:"-"}</div>
           <p className="text-[10px] text-gray-400 font-semibold">{d.label}</p>
         </div>
       ))}
@@ -555,11 +563,12 @@ export function ListeningQuiz({deck,onBack,addXP}) {
   const pick=(opt)=>{
     if(chosen)return;
     setChosen(opt.id);
-    if(opt.id===q.id){setScore(s=>s+1);addXP(20);}
+    if(opt.id===q.id){setScore(s=>s+1);addXP(20);answerFeedback.correct();}
+    else{answerFeedback.incorrect();}
   };
   const next=()=>{setChosen(null);if(idx+1>=cards.length)setDone(true);else setIdx(i=>i+1);};
 
-  if(cards.length<4) return <div className="text-center py-10 text-gray-400"><p className="text-3xl mb-2">🎧</p><p className="text-sm">Need 4+ cards for listening quiz.</p><button type="button" aria-label="Back from listening quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
+  if(cards.length<4) return <div className="text-center py-10 text-gray-400"><Headphones size={36} className="mx-auto mb-2 opacity-30" aria-hidden="true" /><p className="text-sm mt-1">Need 4+ cards for listening quiz.</p><button type="button" aria-label="Back from listening quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
 
   if(done) return (
     <div className="flex flex-col gap-4 items-center text-center">
@@ -576,19 +585,19 @@ export function ListeningQuiz({deck,onBack,addXP}) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <button type="button" aria-label="Back from listening quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button>
-        <p className="font-bold text-gray-700 flex-1">🎧 Listening &middot; {deck.name}</p>
+        <button type="button" aria-label="Back from listening quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700"><ArrowLeft size={20} aria-hidden="true" /></button>
+        <p className="font-bold text-gray-700 flex-1 flex items-center gap-1.5"><Headphones size={15} aria-hidden="true" /> Listening &middot; {deck.name}</p>
         <span className="text-xs text-gray-400">{idx+1}/{cards.length}</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-1.5">
         <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{width: ((idx/cards.length)*100) + "%"}}/>
       </div>
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center border border-indigo-100">
+      <div className="bg-white rounded-2xl p-8 text-center border border-gray-200">
         <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Listen and choose the correct word</p>
-        <button type="button" aria-label="Play listening prompt" onClick={speak} className="w-20 h-20 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-4xl flex items-center justify-center mx-auto shadow-lg transition-colors">🔊</button>
+        <button type="button" aria-label="Play listening prompt" onClick={speak} className="w-20 h-20 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg transition-colors"><Volume2 size={32} aria-hidden="true" /></button>
         <p className="text-xs text-gray-400 mt-3">Tap to hear again</p>
-        <button type="button" aria-label="Play listening prompt slowly" onClick={speakSlow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition-colors shadow-sm">
-          🐢 Slow
+        <button type="button" aria-label="Play listening prompt slowly" onClick={speakSlow} className="mt-3 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-200 transition-colors shadow-sm">
+          <Gauge size={13} aria-hidden="true" /> Slow
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -617,7 +626,7 @@ function Flashcard({card,onRate,setNote}) {
     flipActionRef.current?.focus();
   },[flipped]);
   const saveNote=()=>{setNote(card.id,noteVal);setEditNote(false);};
-  const toggleFlipped=()=>setFlipped(f=>!f);
+  const toggleFlipped = () => { answerFeedback.flip(); setFlipped(f => !f); };
   return (
     <div className="dh-study-card-flow">
       <div className="dh-study-card-wrap" style={{perspective:"1000px"}}>
@@ -698,9 +707,9 @@ export function QuizMode({deck,onBack,addXP}) {
   const [done,setDone] = useState(false);
   const q=cards[idx];
   const opts=useMemo(()=>{if(!q)return[];const w=cards.filter(c=>c.id!==q.id).sort(()=>Math.random()-0.5).slice(0,3);return [...w,q].sort(()=>Math.random()-0.5);},[idx]);
-  const pick=(opt)=>{if(chosen)return;setChosen(opt.id);if(opt.id===q.id){setScore(s=>s+1);addXP(15);}};
+  const pick=(opt)=>{if(chosen)return;setChosen(opt.id);if(opt.id===q.id){setScore(s=>s+1);addXP(15);answerFeedback.correct();}else{answerFeedback.incorrect();}};
   const next=()=>{setChosen(null);if(idx+1>=cards.length)setDone(true);else setIdx(i=>i+1);};
-  if(cards.length<4)return <div className="text-center py-12 text-gray-400"><p className="text-3xl mb-2">🃏</p><p className="text-sm">Need at least 4 cards.</p><button type="button" aria-label="Back from quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
+  if(cards.length<4)return <div className="text-center py-12 text-gray-400"><ClipboardList size={36} className="mx-auto mb-2 opacity-30" aria-hidden="true" /><p className="text-sm mt-1">Need at least 4 cards.</p><button type="button" aria-label="Back from quiz" onClick={onBack} className="mt-4 text-blue-500 text-sm">← Back</button></div>;
   if(done)return(
     <div className="flex flex-col gap-4 items-center text-center">
       <div className="bg-white rounded-2xl shadow border p-8 w-full"><p className="text-4xl mb-3">{score===cards.length?"🏆":score>cards.length/2?"😊":"💪"}</p><p className="font-extrabold text-2xl text-gray-800">{score}/{cards.length}</p><p className="text-sm text-gray-500">{Math.round(score/cards.length*100)}% correct</p></div>
@@ -710,7 +719,7 @@ export function QuizMode({deck,onBack,addXP}) {
   );
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2"><button type="button" aria-label="Back from quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">Quiz &middot; {deck.name}</p><span className="text-xs text-gray-400">{idx+1}/{cards.length}</span></div>
+      <div className="flex items-center gap-2"><button type="button" aria-label="Back from quiz" onClick={onBack} className="text-gray-400 hover:text-gray-700"><ArrowLeft size={20} aria-hidden="true" /></button><p className="font-bold text-gray-700 flex-1">Quiz &middot; {deck.name}</p><span className="text-xs text-gray-400">{idx+1}/{cards.length}</span></div>
       <div className="w-full bg-gray-200 rounded-full h-1.5"><div className="bg-purple-500 h-1.5 rounded-full" style={{width: ((idx/cards.length)*100) + "%"}}/></div>
       <div className="bg-white rounded-2xl shadow border p-6 text-center"><p className="text-xs text-gray-400 uppercase tracking-widest mb-2">What is the German for…</p><p className="text-2xl font-bold text-gray-800">{q.front}</p></div>
       <div className="grid grid-cols-2 gap-2">
@@ -727,12 +736,12 @@ export function WritingPractice({deck,onBack,addXP}) {
   const [idx,setIdx]=useState(0);const [input,setInput]=useState("");const [result,setResult]=useState(null);const [score,setScore]=useState(0);const ref=useRef();
   useEffect(()=>{setInput("");setResult(null);ref.current?.focus();},[idx]);
   const q=cards[idx%cards.length];
-  const check=()=>{if(!input.trim())return;const ans=q.back.toLowerCase().trim();const usr=input.toLowerCase().trim();const ok=ans===usr||ans.replace(/^(der|die|das)\s/,"")===usr.replace(/^(der|die|das)\s/,"");setResult(ok);if(ok){setScore(s=>s+1);addXP(20);}};
+  const check=()=>{if(!input.trim())return;const ans=q.back.toLowerCase().trim();const usr=input.toLowerCase().trim();const ok=ans===usr||ans.replace(/^(der|die|das)\s/,"")===usr.replace(/^(der|die|das)\s/,"");setResult(ok);if(ok){setScore(s=>s+1);addXP(20);answerFeedback.correct();}else{answerFeedback.incorrect();}};
   const renderDiff=()=>q.back.split("").map((ch,i)=><span key={i} className={input[i]?.toLowerCase()===ch.toLowerCase()?"text-green-600 font-bold":"text-red-500 font-bold"}>{ch}</span>);
   if(!q)return null;
   return(
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2"><button type="button" aria-label="Back from writing practice" onClick={onBack} className="text-gray-400 hover:text-gray-700 text-xl">←</button><p className="font-bold text-gray-700 flex-1">✍️ Writing &middot; {deck.name}</p><span className="text-xs text-green-600 font-bold">✓ {score}</span></div>
+      <div className="flex items-center gap-2"><button type="button" aria-label="Back from writing practice" onClick={onBack} className="text-gray-400 hover:text-gray-700"><ArrowLeft size={20} aria-hidden="true" /></button><p className="font-bold text-gray-700 flex-1">Writing &middot; {deck.name}</p><span className="text-xs text-green-600 font-bold">{score} ✔</span></div>
       <div className="bg-white rounded-2xl shadow border p-6 text-center"><p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Translate to German</p><p className="text-2xl font-bold text-gray-800 mb-1">{q.front}</p><p className="text-xs text-gray-400 italic">{q.exampleEn}</p></div>
       <div className="flex gap-2"><input ref={ref} className={"flex-1 border-2 rounded-xl px-4 py-3 text-base focus:outline-none " + (result===null?"border-gray-200 focus:border-blue-400":result?"border-green-400":"border-red-400")} placeholder="Type the German word…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(result===null?check():setIdx(i=>(i+1)%cards.length))} disabled={result!==null}/>{result===null&&<button onClick={check} className="bg-blue-600 text-white font-bold px-4 rounded-xl">Check</button>}</div>
       {result!==null&&<div className={"rounded-2xl p-4 " + (result?"bg-green-50 border border-green-200":"bg-red-50 border border-red-200")}><div className="flex items-center gap-2 mb-2"><span className="text-xl">{result?"✅":"❌"}</span><span className={"font-bold text-sm " + (result?"text-green-700":"text-red-700")}>{result?"Correct! +20 XP":"Not quite"}</span></div><div className="text-sm mb-1">{renderDiff()}</div><p className="text-xs text-gray-500 mt-1 italic">{q.exampleDe}</p><div className="flex gap-2 mt-3"><SpeakBtn text={q.back}/><button onClick={()=>setIdx(i=>(i+1)%cards.length)} className="ml-auto text-xs bg-blue-600 text-white px-4 py-1.5 rounded-xl font-bold">Next →</button></div></div>}
@@ -741,13 +750,13 @@ export function WritingPractice({deck,onBack,addXP}) {
 }
 
 // ── SRS SESSION ───────────────────────────────────────────────
-export function SRSSession({deck,onBack,onUpdateDeck,addXP,addStreak}) {
+export function SRSSession({deck,onBack,onUpdateDeck,addXP,addStreak,addActivity}) {
   const due=deck.cards.filter(isDue);
   // Sort: weakest (lowest confidence) cards come first
   const [queue]=useState(()=>[...due].sort((a,b)=>((a.confidenceScore??70)-(b.confidenceScore??70))));
   const [idx,setIdx]=useState(0);const [scores,setScores]=useState({0:0,1:0,2:0,3:0});const [done,setDone]=useState(false);const [sessionXP,setSessionXP]=useState(0);
   const setNote=(cid,note)=>onUpdateDeck({...deck,cards:deck.cards.map(c=>c.id===cid?{...c,note}:c)});
-  const handleRate=(r)=>{const card=queue[idx];const updated=sm2(card,r);onUpdateDeck({...deck,cards:deck.cards.map(c=>c.id===card.id?updated:c)});const xp=xpFor(r);addXP(xp);setSessionXP(s=>s+xp);setScores(s=>({...s,[r]:s[r]+1}));if(idx+1>=queue.length){setDone(true);addStreak();}else setIdx(i=>i+1);};
+  const handleRate=(r)=>{const card=queue[idx];const updated=sm2(card,r);onUpdateDeck({...deck,cards:deck.cards.map(c=>c.id===card.id?updated:c)});const xp=xpFor(r);addXP(xp);addActivity?.(1);setSessionXP(s=>s+xp);setScores(s=>({...s,[r]:s[r]+1}));if(idx+1>=queue.length){setDone(true);addStreak();}else setIdx(i=>i+1);};
   const total=Object.values(scores).reduce((a,b)=>a+b,0);
   const studyTitle=`${deck.name} study session`;
   const studyId="dh-study-title";
@@ -788,14 +797,14 @@ function GrammarPanel({level}) {
     <div className="flex flex-col gap-4">
       <div className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100">
-          <p className="font-bold text-gray-700 text-sm uppercase tracking-widest">📖 Grammar Reference &middot; {level}</p>
+          <p className="flex items-center gap-2 font-bold text-gray-700 text-sm uppercase tracking-widest"><BookOpen size={14} aria-hidden="true" /> Grammar Reference &middot; {level}</p>
           <p className="text-xs text-gray-400 mt-1">{LEVELS[level]?.label}</p>
         </div>
         {(GRAMMAR[level]||[]).map((r,i)=>(
           <div key={i} className="border-t border-gray-100">
             <button onClick={()=>setOpen(open===i?null:i)} className="w-full text-left px-4 py-3 flex justify-between items-center hover:bg-gray-50">
               <span className="text-sm font-semibold text-gray-700">{r.title}</span>
-              <span className="text-gray-400 text-lg">{open===i?"−":"+"}</span>
+              {open===i ? <ChevronUp size={16} className="text-gray-400" aria-hidden="true" /> : <ChevronDown size={16} className="text-gray-400" aria-hidden="true" />}
             </button>
             {open===i&&<div className="px-4 pb-3"><pre className="text-xs text-gray-600 bg-gray-50 rounded-xl p-3 whitespace-pre-wrap font-mono leading-relaxed">{r.content}</pre></div>}
           </div>
@@ -816,7 +825,7 @@ function GrammarPanel({level}) {
 
 // ── DECK DETAIL ───────────────────────────────────────────────
 // ── LIBRARY ───────────────────────────────────────────────────
-function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel, onFocusedModeChange}) {
+function Library({library,setLibrary,addXP,addStreak,addActivity,user,setUser, setLevel, onFocusedModeChange}) {
   const [openId,setOpenId]=useState(null);
 
   useEffect(() => {
@@ -855,48 +864,73 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel, onF
     setImporting(false);
   };
 
-  if(openDeck)return <DeckDetail deck={openDeck} setLibrary={setLibrary} onBack={()=>{setOpenId(null);onFocusedModeChange?.(false);}} onFocusedModeChange={onFocusedModeChange} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} deps={{ uid, today, isWeak, isDue, DB, generateAIFlashcards, generateAITutorResponse, CardModal, SRSSession, QuizMode, WritingPractice, ListeningQuiz, publishPublicDeck: DB.publishPublicDeck.bind(DB) }}/>;
+  if(openDeck)return <DeckDetail deck={openDeck} setLibrary={setLibrary} onBack={()=>{setOpenId(null);onFocusedModeChange?.(false);}} onFocusedModeChange={onFocusedModeChange} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} deps={{ uid, today, isWeak, isDue, DB, generateAIFlashcards, generateAITutorResponse, CardModal, SRSSession, QuizMode, WritingPractice, ListeningQuiz, addActivity, publishPublicDeck: DB.publishPublicDeck.bind(DB) }}/>;
 
   return(
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-extrabold text-gray-800 text-lg">📚 My Library</h2>
+        <h2 className="flex items-center gap-2 font-extrabold text-gray-800 text-lg"><LibraryIcon size={18} aria-hidden="true" /> My Library</h2>
         <div className="flex gap-2">
-          <button onClick={()=>setImportModal(true)} className="bg-gray-100 text-gray-600 text-xs font-bold px-3 py-2 rounded-xl hover:bg-gray-200">📥 Import</button>
-          <button onClick={addDeck} className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl hover:bg-blue-700">+ New Deck</button>
+          <button onClick={()=>setImportModal(true)} className="flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-2 rounded-xl hover:bg-gray-200"><Download size={13} aria-hidden="true" /> Import</button>
+          <button onClick={addDeck} className="bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl hover:bg-blue-700"><Plus size={13} className="inline mr-0.5" aria-hidden="true" /> New Deck</button>
         </div>
       </div>
 
-      {library.length===0&&<div className="text-center py-12 text-gray-400"><p className="text-4xl mb-2">📭</p><p className="text-sm">No decks yet.</p></div>}
+      {library.length===0&&<div className="text-center py-12 text-gray-400"><LibraryIcon size={40} className="mx-auto mb-3 opacity-30" aria-hidden="true" /><p className="text-sm">No decks yet. Create your first deck!</p></div>}
 
-      <div className="flex flex-col gap-3">
+      <div className="dh-library-grid">
         {library.map(deck=>{
           const dueCount=deck.cards.filter(isDue).length;
-          const mastery=deck.cards.length>0?Math.round(deck.cards.filter(c=>c.interval>=21).length/deck.cards.length*100):0;
+          const total=deck.cards.length;
+          const mastery=total>0?Math.round(deck.cards.filter(c=>c.interval>=21).length/total*100):0;
+          const levelCls = LEVELS[deck.level]?.color || "bg-gray-100 text-gray-500";
+          const state = dueCount>0 ? "due" : mastery>0 ? "mastered" : "fresh";
           return(
-            <div key={deck.id} className="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
-              <div className="flex items-center gap-3 p-4">
-                <div className={"w-12 h-12 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 " + (LEVELS[deck.level]?.color || "")}>{deck.level}</div>
-                <div className="flex-1 min-w-0">
-                  {editId===deck.id?<input autoFocus className="border border-blue-300 rounded-lg px-2 py-1 text-sm w-full focus:outline-none font-bold" value={newName} onChange={e=>setNewName(e.target.value)} onBlur={()=>{setLibrary(l=>l.map(d=>d.id===deck.id?{...d,name:newName||d.name}:d));setEditId(null);}} onKeyDown={e=>e.key==="Enter"&&(setLibrary(l=>l.map(d=>d.id===deck.id?{...d,name:newName||d.name}:d)),setEditId(null))}/>
-                  :<p className="font-bold text-gray-800 truncate">{deck.name}</p>}
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-gray-400">{deck.cards.length} cards</p>
-                    {dueCount>0&&<span className="text-xs bg-red-100 text-red-600 font-bold px-1.5 rounded-full">{dueCount} due</span>}
-                    {mastery>0&&<span className="text-xs text-green-600 font-semibold">{mastery}% mastered</span>}
+            <div key={deck.id} className={`dh-deck-card dh-deck-card--${state}`}>
+              {/* Header: level badge | title + meta | icon actions */}
+              <div className="dh-deck-card-header">
+                <div className={`dh-deck-level-badge ${levelCls}`}>{deck.level}</div>
+                <div className="dh-deck-card-title-block">
+                  {editId===deck.id
+                    ? <input autoFocus className="dh-deck-name-input" value={newName}
+                        onChange={e=>setNewName(e.target.value)}
+                        onBlur={()=>{setLibrary(l=>l.map(d=>d.id===deck.id?{...d,name:newName||d.name}:d));setEditId(null);}}
+                        onKeyDown={e=>e.key==="Enter"&&(setLibrary(l=>l.map(d=>d.id===deck.id?{...d,name:newName||d.name}:d)),setEditId(null))}/>
+                    : <p className="dh-deck-name">{deck.name}</p>}
+                  <div className="dh-deck-meta">
+                    <span>{total} {total===1?"card":"cards"}</span>
+                    {mastery>0 && <><span className="dh-deck-meta-dot">·</span><span className="dh-deck-mastered-badge">{mastery}% mastered</span></>}
+                    {mastery===0 && total>0 && <><span className="dh-deck-meta-dot">·</span><span className="dh-deck-new-badge">New</span></>}
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button type="button" aria-label={`Edit ${deck.name}`} onClick={()=>{setEditId(deck.id);setNewName(deck.name);}} className="text-xs px-2 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">✏️</button>
-                  <button type="button" aria-label={`Delete ${deck.name}`} onClick={()=>setConfirmDel(deck.id)} className="text-xs px-2 py-1.5 rounded-lg bg-red-100 text-red-500 hover:bg-red-200">🗑</button>
-                  <button type="button" onClick={()=>setOpenId(deck.id)} className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 border border-blue-200">Open →</button>
+                <div className="dh-deck-card-actions">
+                  <button type="button" aria-label={`Edit ${deck.name}`}
+                    onClick={()=>{setEditId(deck.id);setNewName(deck.name);}}
+                    className="dh-deck-icon-btn">
+                    <Pencil size={13} aria-hidden="true"/>
+                  </button>
+                  <button type="button" aria-label={`Delete ${deck.name}`}
+                    onClick={()=>setConfirmDel(deck.id)}
+                    className="dh-deck-icon-btn dh-deck-icon-btn-danger">
+                    <Trash2 size={13} aria-hidden="true"/>
+                  </button>
                 </div>
               </div>
-              {deck.cards.length>0&&<div className="px-4 pb-3">
-                <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="bg-green-500 h-1.5 rounded-full" style={{width: mastery + "%"}}/></div>
-                <div className="flex gap-1 mt-2 overflow-x-auto">{deck.cards.slice(0,5).map(c=><span key={c.id} className={"shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold " + (GS[c.gender]?.badge || "")}>{c.back}</span>)}{deck.cards.length>5&&<span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-semibold">+{deck.cards.length-5}</span>}</div>
-                <div className="flex gap-1 mt-2">{Object.keys(LEVELS).map(l=><button key={l} onClick={()=>changeLevel(deck.id,l)} className={"text-xs px-1.5 py-0.5 rounded-lg font-bold border transition-all " + (deck.level===l ? LEVELS[l].color+" border-transparent" : "bg-gray-100 text-gray-400 border-gray-100")}>{l}</button>)}</div>
-              </div>}
+
+              {/* Mastery progress — green only, shown when there's something to show */}
+              <div className="dh-deck-progress-wrap">
+                <div className="dh-deck-progress-track">
+                  <div className="dh-deck-progress-fill" style={{width: mastery+"%"}}/>
+                </div>
+              </div>
+
+              {/* CTA footer — changes text when due cards exist */}
+              <button type="button" onClick={()=>setOpenId(deck.id)} className="dh-deck-open-btn">
+                {dueCount>0
+                  ? <><span>Study now</span><span className="dh-deck-open-due-count">{dueCount} due</span></>
+                  : <span>Open deck</span>}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
             </div>
           );
         })}
@@ -905,7 +939,7 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel, onF
       {importModal&&(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>setImportModal(false)}>
           <div ref={importDialogRef} role="dialog" aria-modal="true" aria-labelledby="import-dialog-title" className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={e=>e.stopPropagation()}>
-            <h3 id="import-dialog-title" className="font-bold text-gray-800 mb-3">📥 Import Deck</h3>
+            <h3 id="import-dialog-title" className="flex items-center gap-2 font-bold text-gray-800 mb-3"><Download size={16} aria-hidden="true" /> Import Deck</h3>
             <p className="text-xs text-gray-400 mb-3">Paste a shared deck code below</p>
             <input data-dialog-initial-focus="true" aria-label="Shared deck code" className="w-full border border-gray-200 rounded-xl px-3 py-3 text-base font-bold text-center uppercase tracking-widest focus:outline-none" placeholder="e.g. X9K2A1" value={importCode} onChange={e=>setImportCode(e.target.value)}/>
             {importErr&&<p role="alert" className="text-xs text-red-500 mt-1 text-center font-bold">{importErr}</p>}
@@ -920,7 +954,7 @@ function Library({library,setLibrary,addXP,addStreak,user,setUser, setLevel, onF
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={()=>setConfirmDel(null)}>
           <div ref={deleteDialogRef} role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" className="bg-white rounded-2xl p-6 shadow-2xl max-w-xs w-full text-center" onClick={e=>e.stopPropagation()}>
             <h3 id="delete-dialog-title" className="sr-only">Delete deck confirmation</h3>
-            <p className="text-2xl mb-2">🗑️</p><p className="font-bold text-gray-800 mb-1">Delete this deck?</p><p className="text-xs text-gray-400 mb-4">This cannot be undone.</p>
+            <Trash2 size={28} className="mx-auto mb-2 text-red-400" aria-hidden="true" /><p className="font-bold text-gray-800 mb-1">Delete this deck?</p><p className="text-xs text-gray-400 mb-4">This cannot be undone.</p>
             <div className="flex gap-2"><button type="button" data-dialog-initial-focus="true" onClick={()=>setConfirmDel(null)} className="flex-1 py-2 rounded-xl border text-sm text-gray-500">Cancel</button><button type="button" onClick={()=>delDeck(confirmDel)} className="flex-1 py-2 rounded-xl bg-red-500 text-white font-bold text-sm">Delete</button></div>
           </div>
         </div>
@@ -992,10 +1026,10 @@ function GeneratePanel({level,library,setLibrary,user,setUser}) {
     <div className="flex flex-col gap-4">
       <div className="bg-white rounded-2xl shadow border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">✨ AI Generator &middot; {level}</p>
+          <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-widest"><Brain size={13} aria-hidden="true" /> AI Generator &middot; {level}</p>
           <div className="flex gap-2 items-center">
             {user && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{(user.lastGenDate===today()?(user.dailyGens||0):0)}/5 Used</span>}
-            <button onClick={()=>setImportMode(m=>!m)} className={"text-xs px-2 py-1 rounded-lg font-semibold border " + (importMode?"bg-blue-100 border-blue-300 text-blue-600":"bg-gray-100 border-gray-200 text-gray-500")}>📋 Import list</button>
+            <button onClick={()=>setImportMode(m=>!m)} className={"flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-semibold border " + (importMode?"bg-blue-100 border-blue-300 text-blue-600":"bg-gray-100 border-gray-200 text-gray-500")}><ClipboardList size={12} aria-hidden="true" /> Import list</button>
           </div>
         </div>
         {importMode?(
@@ -1009,12 +1043,12 @@ function GeneratePanel({level,library,setLibrary,user,setUser}) {
       </div>
       {preview.length>0&&(
         <div className="bg-white rounded-2xl shadow border overflow-hidden">
-          <div className="p-4 border-b flex items-center justify-between"><p className="font-bold text-gray-700 text-sm">Preview &middot; {preview.length} cards</p>{saved&&<span className="text-xs text-green-600 font-bold">✓ Saved!</span>}</div>
+          <div className="p-4 border-b flex items-center justify-between"><p className="font-bold text-gray-700 text-sm">Preview &middot; {preview.length} cards</p>{saved&&<span className="flex items-center gap-1 text-xs text-green-600 font-bold"><Check size={13} aria-hidden="true" /> Saved</span>}</div>
           <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">{preview.map(c=><div key={c.id} className="flex items-center gap-2 px-4 py-2"><GBadge g={c.gender}/><span className="text-sm font-medium text-gray-700">{c.back}</span><span className="text-xs text-gray-400">&middot; {c.front}</span><div className="ml-auto"><SpeakBtn text={c.back} small/></div></div>)}</div>
           {!saved&&<div className="p-4 border-t flex flex-col gap-2">
-            <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={target} onChange={e=>setTarget(e.target.value)}><option value="__new__">➕ Create new deck</option>{library.map(d=><option key={d.id} value={d.id}>{d.name} ({d.cards.length})</option>)}</select>
+            <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={target} onChange={e=>setTarget(e.target.value)}><option value="__new__">+ Create new deck</option>{library.map(d=><option key={d.id} value={d.id}>{d.name} ({d.cards.length})</option>)}</select>
             {target==="__new__"&&<input className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none" placeholder="New deck name (optional)" value={newName} onChange={e=>setNewName(e.target.value)}/>}
-            <button onClick={saveCards} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-sm">💾 Save {preview.length} Cards</button>
+            <button onClick={saveCards} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-sm"><Save size={15} aria-hidden="true" /> Save {preview.length} Cards</button>
           </div>}
         </div>
       )}
@@ -1031,7 +1065,7 @@ function Leaderboard({currentUser}) {
   return(
     <div className="flex flex-col gap-4">
       <div className="bg-white rounded-2xl shadow border overflow-hidden">
-        <div className="p-4 border-b"><p className="font-bold text-gray-700 text-sm uppercase tracking-widest">🏆 Global Leaderboard</p><p className="text-xs text-gray-400 mt-0.5">Top learners by XP</p></div>
+        <div className="p-4 border-b"><p className="flex items-center gap-2 font-bold text-gray-700 text-sm uppercase tracking-widest"><Trophy size={14} aria-hidden="true" /> Global Leaderboard</p><p className="text-xs text-gray-400 mt-0.5">Top learners by XP</p></div>
         {loading?<div className="text-center py-8 text-gray-400 text-sm">Loading…</div>
         :<div className="divide-y divide-gray-50">
           {board.map((u,i)=>(
@@ -1048,7 +1082,7 @@ function Leaderboard({currentUser}) {
         </div>}
       </div>
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700">
-        <p className="font-bold mb-1">💡 Tip</p>
+        <p className="font-bold mb-1">Tip</p>
         <p className="text-xs">Study daily and rate cards "Easy" to earn more XP and climb the leaderboard!</p>
       </div>
     </div>
@@ -1127,6 +1161,7 @@ function SupportCard() {
 
 // ── STATS VIEW ────────────────────────────────────────────────
 function StatsView({library,xp,streak,goal,setGoal,dailyDone,history,user,onSignOut,installPrompt,setInstallPrompt,themePreference,setThemePreference}) {
+  const [soundOn, setSoundOn] = useState(() => answerFeedback.isEnabled());
   const handleInstall = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
@@ -1181,6 +1216,18 @@ function StatsView({library,xp,streak,goal,setGoal,dailyDone,history,user,onSign
             <option value={THEME_PREFERENCES.LIGHT}>Light</option>
             <option value={THEME_PREFERENCES.DARK}>Dark</option>
           </select>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor="sound-feedback" className="text-xs font-semibold text-gray-500">Answer sounds</label>
+          <button
+            id="sound-feedback"
+            role="switch"
+            aria-checked={soundOn}
+            onClick={() => { const next = !soundOn; setSoundOn(next); answerFeedback.setEnabled(next); }}
+            className={"relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 " + (soundOn ? "bg-blue-600" : "bg-gray-300")}
+          >
+            <span className={"inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform " + (soundOn ? "translate-x-4" : "translate-x-0.5")} />
+          </button>
         </div>
       </div>
 
@@ -1385,11 +1432,12 @@ export function AITutor({deck, onClose}) {
   );
 }
 
+
 // ── DAILY MISSIONS ────────────────────────────────────────────
 const MISSION_DEFS = [
-  { id:"reviews",  icon:"🃏", label:"Complete 10 reviews",   target:10,  xpReward:50  },
-  { id:"learning", icon:"📖", label:"Learn 5 new cards",     target:5,   xpReward:30  },
-  { id:"streak",   icon:"🔥", label:"Study 1 deck today",    target:1,   xpReward:20  },
+  { id:"reviews",  Icon: Brain,     label:"Complete 10 reviews",  target:10, xpReward:50 },
+  { id:"learning", Icon: BookOpen,  label:"Learn 5 new cards",    target:5,  xpReward:30 },
+  { id:"streak",   icon:"🔥",       label:"Study 1 deck today",   target:1,  xpReward:20 },
 ];
 
 function DailyMissions({missions, onClaim, dailyDone, streak}) {
@@ -1402,7 +1450,7 @@ function DailyMissions({missions, onClaim, dailyDone, streak}) {
   return (
     <div className="bg-white rounded-2xl shadow border border-gray-100 p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">🎯 Daily Missions</p>
+        <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-widest"><Target size={13} aria-hidden="true" /> Daily Missions</p>
         <span className="text-xs text-gray-400">{missions.filter(m=>m.claimed).length}/{MISSION_DEFS.length} done</span>
       </div>
       <div className="flex flex-col gap-2">
@@ -1416,11 +1464,11 @@ function DailyMissions({missions, onClaim, dailyDone, streak}) {
             <div key={def.id} className={"rounded-xl p-3 border transition-all " + (missionState.claimed ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-100")}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{def.icon}</span>
+                  {def.Icon ? <def.Icon size={15} className="text-gray-500" aria-hidden="true" /> : <span className="text-base" aria-hidden="true">{def.icon}</span>}
                   <p className={"text-xs font-semibold " + (missionState.claimed ? "text-green-700" : "text-gray-700")}>{def.label}</p>
                 </div>
                 {missionState.claimed ? (
-                  <span className="text-xs font-bold text-green-600">✅ Claimed</span>
+                  <span className="flex items-center gap-0.5 text-xs font-bold text-green-600"><Check size={13} aria-hidden="true" /> Claimed</span>
                 ) : canClaim ? (
                   <button onClick={() => onClaim(def)} className="text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded-lg transition-colors">
                     +{def.xpReward} XP
@@ -1429,8 +1477,11 @@ function DailyMissions({missions, onClaim, dailyDone, streak}) {
                   <span className="text-xs text-gray-400 font-bold">{prog}/{def.target}</span>
                 )}
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-1">
-                <div className={"h-1 rounded-full transition-all " + (missionState.claimed ? "bg-green-400" : "bg-blue-400")} style={{width: pct + "%"}}/>
+              <div className="w-full rounded-full h-1" style={{background: 'var(--dh-color-surface-subtle)'}}>
+                <div
+                  className={"h-1 rounded-full transition-all " + (missionState.claimed ? "bg-green-400" : "bg-blue-400")}
+                  style={{width: (missionState.claimed ? 100 : pct) + "%"}}
+                />
               </div>
             </div>
           );
@@ -1574,27 +1625,64 @@ function HomeTab({library,addXP,setNav,user,xp,streak,dailyDone,userGoal,setUser
   const badge=getBadge(xp);
   const totalDue=library.reduce((a,d)=>a+d.cards.filter(isDue).length,0);
   const [showGoalModal, setShowGoalModal] = useState(false);
+
+  // Find the most-due deck for a targeted study prompt
+  const topDueDeck = totalDue > 0
+    ? [...library].sort((a,b)=>b.cards.filter(isDue).length-a.cards.filter(isDue).length)[0]
+    : null;
+
+  // Adaptive section order: when cards are due, promote the study prompt
+  const hasDue = totalDue > 0;
+  const hasDecks = library.length > 0;
+
   return(
     <div className="flex flex-col gap-4">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 text-white">
+
+      {/* ── Hero band — rich gradient for premium feel ── */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-4 text-white">
         <p className="text-sm font-semibold opacity-80">Good {new Date().getHours()<12?"morning":new Date().getHours()<17?"afternoon":"evening"}, {user?.name?.split(" ")[0]||"Learner"}! 👋</p>
         <div className="flex items-center gap-3 mt-1">
           <div><p className="text-2xl font-extrabold">{badge.icon} {badge.label}</p><p className="text-xs opacity-70">{xp} XP &middot; {streak} day streak 🔥</p></div>
         </div>
       </div>
+
+      {/* ── No-decks CTA ── */}
+      {!hasDecks && (
+        <button onClick={()=>setNav("library")} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl text-sm transition-colors">
+          + Create your first deck
+        </button>
+      )}
+
+      {/* ── WOTD — daily ritual, chromatic surface ── */}
       <WordOfDay addXP={addXP}/>
+
+      {/* ── Goal card ── */}
       <GoalProgressCard userGoal={userGoal} dailyDone={dailyDone} onEdit={()=>setShowGoalModal(true)}/>
+
+      {/* ── Daily Missions ── */}
       <DailyMissions missions={missions} onClaim={onClaimMission} dailyDone={dailyDone} streak={streak}/>
-      {totalDue>0&&<DueBanner library={library} onStudyAll={()=>setNav("library")}/>}
+
+      {/* ── Study prompt when cards are due — below missions, above quick nav ── */}
+      {hasDue && topDueDeck && (
+        <DueBanner library={library} onStudyAll={()=>setNav("library")} />
+      )}
+
+      {/* ── Quick navigation — flat, no gradients ── */}
       <div className="grid grid-cols-2 gap-3">
-        {[{icon:"📚",label:"My Library",sub:`${library.length} decks`,nav:"library",c:"from-blue-50 to-blue-100 border-blue-200"},{icon:"✨",label:"AI Generate",sub:"Create cards with AI",nav:"generate",c:"from-purple-50 to-purple-100 border-purple-200"},{icon:"📖",label:"Grammar",sub:"Quick reference",nav:"grammar",c:"from-green-50 to-green-100 border-green-200"},{icon:"🏆",label:"Leaderboard",sub:"See top learners",nav:"leaderboard",c:"from-yellow-50 to-orange-100 border-orange-200"}].map(item=>(
-          <button key={item.nav} onClick={()=>setNav(item.nav)} className={"bg-gradient-to-br " + (item.c) + " border rounded-2xl p-4 text-left hover:shadow-md transition-all"}>
-            <p className="text-2xl mb-1">{item.icon}</p>
+        {[
+          {Icon: LibraryIcon, label:"My Library",   sub:`${library.length} deck${library.length===1?'':'s'}`, nav:"library"},
+          {Icon: Brain,       label:"AI Generate",  sub:"Create cards with AI",    nav:"generate"},
+          {Icon: BookOpen,    label:"Grammar",       sub:"Quick reference",         nav:"grammar"},
+          {Icon: Trophy,      label:"Leaderboard",   sub:"See top learners",        nav:"leaderboard"},
+        ].map(item=>(
+          <button key={item.nav} onClick={()=>setNav(item.nav)} className="bg-white border border-gray-200 rounded-2xl p-4 text-left hover:bg-gray-50 hover:border-gray-300 transition-colors">
+            <item.Icon size={20} className="text-gray-500 mb-2" aria-hidden="true" />
             <p className="font-bold text-gray-800 text-sm">{item.label}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{item.sub}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
           </button>
         ))}
       </div>
+
       {library.length>0&&(
         <div className="bg-white rounded-2xl shadow border p-4">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Recent Decks</p>
@@ -1602,7 +1690,7 @@ function HomeTab({library,addXP,setNav,user,xp,streak,dailyDone,userGoal,setUser
             {library.slice(0,3).map(d=>{const due=d.cards.filter(isDue).length;return(
               <div key={d.id} className="flex items-center gap-3">
                 <div className={"w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold " + (LEVELS[d.level]?.color)}>{d.level}</div>
-                <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{d.name}</p><p className="text-xs text-gray-400">{d.cards.length} cards{due > 0 ? " - " + due + " due" : ""}</p></div>
+                <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{d.name}</p><p className="text-xs text-gray-400">{d.cards.length} cards{due > 0 ? " · " + due + " due" : ""}</p></div>
                 {due>0&&<span className="text-xs bg-red-100 text-red-600 font-bold px-1.5 rounded-full">{due}</span>}
               </div>
             );})}
@@ -1636,6 +1724,7 @@ export default function App() {
   const [dailyDone,setDailyDone]=useState(0);
   const [goal,setGoal]=useState(20);
   const [history,setHistory]=useState([]); // array of datestrings studied
+  const [activityLog,setActivityLog]=useState({}); // {dateString: cardsReviewedCount}
   const [missions,setMissions]=useState([]); // daily mission states
   const [installPrompt, setInstallPrompt] = useState(null);
   const [focusedMode, setFocusedMode] = useState(false);
@@ -1669,6 +1758,15 @@ export default function App() {
       setXp(userData.xp || 0);
       setStreak(userData.streak || 0);
       setHistory(userData.history || []);
+      // Migration: if activityLog absent, seed from history[] with count=1
+      if (userData.activityLog) {
+        setActivityLog(userData.activityLog);
+      } else if (userData.history?.length) {
+        const migrated = {};
+        (userData.history || []).forEach(d => { migrated[d] = migrated[d] ? migrated[d] + 1 : 1; });
+        setActivityLog(migrated);
+        DB.setUser(fbUser.uid, { activityLog: migrated }).catch(() => {});
+      }
       const lib = await DB.getLibrary(fbUser.uid);
       setLibRaw(lib);
       const ug = await DB.getUserGoal(fbUser.uid);
@@ -1798,6 +1896,15 @@ export default function App() {
     setDailyDone(d=>d+1);
   },[user]);
 
+  const addActivity=useCallback((n=1)=>{
+    const td=today();
+    setActivityLog(prev=>{
+      const next={...prev,[td]:(prev[td]||0)+n};
+      if(user) DB.setUser(user.uid,{activityLog:next}).catch(()=>{});
+      return next;
+    });
+  },[user]);
+
   const addStreak=useCallback(()=>{
     const td=today();
     setLastDay(prev=>{
@@ -1864,12 +1971,12 @@ export default function App() {
     >
       {nav==="home"&&<HomeTab library={library} addXP={addXP} setNav={setNav} user={user} xp={xp} streak={streak} dailyDone={dailyDone} userGoal={userGoal} setUserGoal={setUserGoal} missions={missions} onClaimMission={onClaimMission}/>}
       {nav==="generate"&&<GeneratePanel level={level} library={library} setLibrary={setLibrary} user={user} setUser={setUser}/>}
-      {nav==="learn"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
-      {nav==="library"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
+      {nav==="learn"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} addActivity={addActivity} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
+      {nav==="library"&&<Library library={library} setLibrary={setLibrary} addXP={addXP} addStreak={addStreak} addActivity={addActivity} user={user} setUser={setUser} setLevel={setLevel} onFocusedModeChange={setFocusedMode}/>}
       {nav==="grammar"&&<GrammarPanel level={level}/>}
       {nav==="explore"&&<ExploreTab library={library} setLibrary={setLibrary} user={user}/>}
       {nav==="leaderboard"&&<Leaderboard currentUser={user}/>}
-      {nav==="stats"&&<StatsView library={library} xp={xp} streak={streak} goal={goal} setGoal={setGoal} dailyDone={dailyDone} history={history} user={user} onSignOut={handleSignOut} installPrompt={installPrompt} setInstallPrompt={setInstallPrompt} themePreference={themePreference} setThemePreference={handleThemePreference}/>}
+      {nav==="stats"&&<ProfileTab library={library} xp={xp} streak={streak} goal={goal} setGoal={setGoal} dailyDone={dailyDone} history={history} activityLog={activityLog} user={user} setUser={setUser} onSignOut={handleSignOut} installPrompt={installPrompt} setInstallPrompt={setInstallPrompt} themePreference={themePreference} setThemePreference={handleThemePreference}/>}
     </AppShell>
   );
 }

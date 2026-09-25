@@ -1,12 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 // import { getAnalytics } from "firebase/analytics";
 
 const env = import.meta.env ?? {};
 
-// Production remains the safe default. A local Vite mode can override each
-// public Firebase web setting without changing the production project.
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyC81zYctRKw6JLgR2PIvuS6-yBoUNDCAlk",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "deutsch-hub-ea48a.firebaseapp.com",
@@ -20,6 +19,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // const analytics = getAnalytics(app);

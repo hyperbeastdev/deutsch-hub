@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Bot, X, BookOpen, PenLine, Check } from "lucide-react";
 import { getAIUserMessage } from "../ai/errors";
 import useDialogA11y from "../hooks/useDialogA11y";
 
@@ -42,10 +43,10 @@ export default function AITutorModal({ deck, onClose, generateAITutorResponse })
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ai-tutor-dialog-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div>
-            <h3 id="ai-tutor-dialog-title" className="font-extrabold text-gray-800">🤖 AI Tutor</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Powered by Groq</p>
+            <h3 id="ai-tutor-dialog-title" className="flex items-center gap-2 font-extrabold text-gray-800"><Bot size={16} aria-hidden="true" /> AI Tutor</h3>
+            <p className="text-xs text-gray-400 mt-0.5">AI-powered explanations</p>
           </div>
-          <button type="button" aria-label="Close AI Tutor dialog" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+          <button type="button" aria-label="Close AI Tutor dialog" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded"><X size={18} aria-hidden="true" /></button>
         </div>
 
         <div className="p-4 border-b border-gray-100">
